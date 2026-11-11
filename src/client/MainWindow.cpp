@@ -694,6 +694,13 @@ void MainWindow::toggleMaximize()
     }
 }
 
+// Qt5/Qt6 兼容：QMouseEvent::globalPosition() 是 Qt6 新 API，Qt5 为 globalPos()
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#define MOUSE_GLOBAL_POS(mouse) ((mouse)->globalPosition().toPoint())
+#else
+#define MOUSE_GLOBAL_POS(mouse) ((mouse)->globalPos())
+#endif
+
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
     if (watched == m_titleBar) {
@@ -701,14 +708,14 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
             switch (event->type()) {
             case QEvent::MouseButtonPress:
                 if (mouse->button() == Qt::LeftButton && !isMaximized()) {
-                    m_dragOffset = mouse->globalPosition().toPoint() - frameGeometry().topLeft();
+                    m_dragOffset = MOUSE_GLOBAL_POS(mouse) - frameGeometry().topLeft();
                     m_dragging = true;
                     return true;
                 }
                 break;
             case QEvent::MouseMove:
                 if (m_dragging && (mouse->buttons() & Qt::LeftButton)) {
-                    move(mouse->globalPosition().toPoint() - m_dragOffset);
+                    move(MOUSE_GLOBAL_POS(mouse) - m_dragOffset);
                     return true;
                 }
                 break;
