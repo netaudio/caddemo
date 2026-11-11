@@ -10,6 +10,15 @@
 
 namespace cadinput {
 
+// Qt 5 / Qt 6 双版本兼容：Qt 6 把 SkipEmptyParts 移到了 Qt:: 命名空间，
+// Qt 5.15 仍保留在 QString:: 下。麒麟 V10 随系统分发的是 Qt 5.15.2，
+// Windows 开发环境是 Qt 6.7.3，因此这里统一到一个别名。
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+static constexpr auto kSkipEmptyParts = Qt::SkipEmptyParts;
+#else
+static constexpr auto kSkipEmptyParts = QString::SkipEmptyParts;
+#endif
+
 namespace {
 
 struct Fields {
@@ -51,7 +60,7 @@ Result parse(const QString& input, const cad::Vec2& cursor, const cad::Vec2& bas
     if (text.contains(QLatin1Char('='))) {
         Fields fields;
         const QStringList tokens = text.split(QRegularExpression(QStringLiteral("[,;\\s]+")),
-                                              Qt::SkipEmptyParts);
+                                              kSkipEmptyParts);
         for (const QString& token : tokens) {
             const int equal = token.indexOf(QLatin1Char('='));
             if (equal <= 0)
@@ -128,7 +137,7 @@ Result parse(const QString& input, const cad::Vec2& cursor, const cad::Vec2& bas
     // ---- @dx,dz 相对坐标简写 ----
     if (text.startsWith(QLatin1Char('@'))) {
         const QStringList parts = text.mid(1).split(
-            QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
+            QRegularExpression(QStringLiteral("[,;\\s]+")), kSkipEmptyParts);
         double first = 0.0, second = 0.0;
         if (parts.size() >= 2 && parseNumber(parts[0], first) && parseNumber(parts[1], second)) {
             result.kind = Kind::Point;
@@ -143,7 +152,7 @@ Result parse(const QString& input, const cad::Vec2& cursor, const cad::Vec2& bas
 
     // ---- x,z 纯数字对 ----
     const QStringList parts = text.split(QRegularExpression(QStringLiteral("[,;\\s]+")),
-                                        Qt::SkipEmptyParts);
+                                        kSkipEmptyParts);
     double first = 0.0, second = 0.0;
     if (parts.size() >= 2 && parseNumber(parts[0], first) && parseNumber(parts[1], second)) {
         result.kind = Kind::Point;

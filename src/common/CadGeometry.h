@@ -753,7 +753,7 @@ inline std::vector<Vec2> tangentsFromPoint(const Vec2& from, const Vec2& c, doub
     if (dist <= r + kEps || r <= 0.0)          // 原点在圆上/内或半径非法
         return res;
     const double L = std::sqrt(dist * dist - r * r);   // |from - 切点|
-    const Vec2 dir = d / dist;
+    const Vec2 dir = normalized(d);
     const double a = std::asin(std::min(1.0, r / dist));   // 切线与 OC 的夹角
     for (double s : {1.0, -1.0}) {
         const double ang = s * a;
@@ -835,6 +835,8 @@ inline std::vector<Vec2> chainContour(std::vector<Segment> segs, double eps = 1e
     for (std::size_t i = 0; i < segs.size(); ++i)
         if (deg[i] <= 1) { seed = static_cast<int>(i); break; }
 
+    std::vector<bool> used(segs.size(), false);
+
     auto findNext = [&](const Vec2& end) -> int {
         for (std::size_t i = 0; i < segs.size(); ++i) {
             if (used[i])
@@ -849,7 +851,6 @@ inline std::vector<Vec2> chainContour(std::vector<Segment> segs, double eps = 1e
         return -1;
     };
 
-    std::vector<bool> used(segs.size(), false);
     std::vector<Vec2> pts;
     pts.push_back(segs[seed].a);
     pts.push_back(segs[seed].b);

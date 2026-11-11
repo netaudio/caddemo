@@ -1,0 +1,160 @@
+name: Build Linux (Kylin V10 桌面版)
+
+# 目标：编出能在银河麒麟桌面操作系统 V10 SP1 上运行的产物。
+#
+# ── 为什么麒麟侧用 Qt 5.15.2 而不是 Windows 的 Qt 6.7.3 ──────────────────
+#   麒麟桌面版 V10 SP1 基于 Ubuntu 20.04 衍生，系统源提供的 Qt 是 5.15.2（LTS），
+#   源里没有 Qt6 包。而 Qt 6.7 官方 Linux 包需要 GLIBCXX_3.4.28，麒麟桌面版
+#   刚好是 3.4.28 —— 能跑，但 Qt6 在麒麟上属于"非系统自带"，后续升级维护都别扭。
+#   所以麒麟侧一律用系统同款 Qt 5.15.2，Windows 侧继续用 Qt 6.7.3。
+#   代码已做双版本兼容（见 CadInputParser.cpp 的 kSkipEmptyParts）。
+#
+# ── 构建环境选择 ────────────────────────────────────────────────────────
+#   麒麟桌面版 glibc 2.31 / GLIBCXX 3.4.28，与 ubuntu:20.04 (focal) 完全一致。
+#   因此用 ubuntu:20.04 容器构建，产物符号版本天然落在目标机能力内，
+#   无需打包 libstdc++，也不会出现 "GLIBC_2.34 not found"。
+#   （错用 ubuntu-22.04 会出问题：它是 glibc 2.35。）
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  QT_MAJOR: "5"
+  QT_VERSION: "5.15.2"
+  # 目标机能力上限（麒麟桌面版 V10 SP1）
+  KYLIN_MAX_GLIBC: "GLIBC_2.31"
+  KYLIN_MAX_GLIBCXX: "GLIBCXX_3.4.28"
+
+jobs:
+  # =========================================================================
+  # 日常构建：GitHub 托管 runner + Ubuntu 20.04 容器。push 即出包。
+  # =========================================================================
+  kylin-x86_64:
+    name: 麒麟 V10 SP1 · x86_64（托管）
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 容器内构建（Ubuntu 20.04 / glibc 2.31）
+        run: |
+          docker run --rm \
+            -v "$PWD":/src \
+            -w /src \
+            -e QT_MAJOR="${QT_MAJOR}" \
+            -e QT_VERSION="${QT_VERSION}" \
+            -e PREFIX=/src/dist/linux-kylin-x64 \
+            -e BUILD_DIR=/src/build/linux-kylin-x64 \
+            ubuntu:20.04 \
+            bash -c "bash scripts/setup_ubuntu2004.sh && bash scripts/build_linux.sh"
+          sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
+
+      - name: 校验兼容性（GLIBC ≤ 2.31，GLIBCXX ≤ 3.4.28）
+        run: |
+          BIN=dist/linux-kylin-x64/bin
+
+          check_max() {
+            local file="$1" pattern="$2" limit="$3" label="$4"
+            local actual
+            actual=$(objdump -T "$file" | grep -o "$pattern" | sort -uV | tail -1)
+            echo "$label 实际最高：${actual:-none}（上限 ${limit}）"
+            if [ -n "$actual" ] && \
+               [ "$(printf '%s\n%s\n' "$actual" "$limit" | sort -V | tail -1)" != "$limit" ]; then
+              echo "::error::$label 需要 $actual，超出麒麟 V10 SP1 的 $limit"
+              return 1
+            fi
+          }
+
+          check_max "$BIN/caddemo"        'GLIBC_[0-9.]*'   "${KYLIN_MAX_GLIBC}"   "caddemo GLIBC"
+          check_max "$BIN/caddemo"        'GLIBCXX_[0-9.]*' "${KYLIN_MAX_GLIBCXX}" "caddemo GLIBCXX"
+          check_max "$BIN/libQt5Core.so.5" 'GLIBC_[0-9.]*'   "${KYLIN_MAX_GLIBC}"   "Qt5Core GLIBC"
+          check_max "$BIN/libQt5Core.so.5" 'GLIBCXX_[0-9.]*' "${KYLIN_MAX_GLIBCXX}" "Qt5Core GLIBCXX"
+
+          echo "✅ 兼容麒麟桌面版 V10 SP1"
+
+      - name: 冒烟测试（offscreen，无需 X 服务）
+        run: |
+          cd dist/linux-kylin-x64/bin
+          QT_QPA_PLATFORM=offscreen ./caddemo --selftest
+          echo "✅ selftest 正常退出"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: caddemo-kylin-v10sp1-x86_64
+          path: dist/linux-kylin-x64.tar.gz
+          retention-days: 14
+
+      - name: 保留构建日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            build/linux-kylin-x64/CMakeCache.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # =========================================================================
+  # 发版前最终验证：跑在真实的麒麟机器上（self-hosted runner）。
+  # 环境与目标机 100% 相同，可用系统 Qt5 与真实 X 会话做 GUI 验证。
+  #
+  # 需要先在麒麟机器上安装 runner 并打标签 kylin：
+  #   1) 仓库 Settings → Actions → Runners → New self-hosted runner → Linux x64
+  #   2) 按页面提示下载并 ./config.sh --labels kylin
+  #   3) sudo ./svc.sh install && sudo ./svc.sh start
+  #
+  # 未配置 runner 时该 job 会一直停在 Queued；此时可先把下面整段注释掉。
+  # =========================================================================
+  kylin-native:
+    name: 麒麟 V10 SP1 · x86_64（本机验证）
+    runs-on: [self-hosted, kylin]
+    # 只在打 tag 或手动触发时跑，避免日常 push 长期占队
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 环境自检
+        run: |
+          echo "系统   : $(. /etc/os-release && echo "$PRETTY_NAME")"
+          echo "glibc  : $(ldd --version | head -1 | awk '{print $NF}')"
+          echo "gcc    : $(gcc --version | head -1)"
+          echo "libstdc++: $(strings /usr/lib64/libstdc++.so.6 2>/dev/null \
+                        || strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 2>/dev/null \
+                        | grep -o 'GLIBCXX_[0-9.]*' | sort -uV | tail -1)"
+          (qmake -v || qmake-qt5 -v) 2>/dev/null | tail -2 || {
+            echo "::error::未找到系统 Qt5，请先执行 sudo apt install qtbase5-dev"
+            exit 1
+          }
+          cmake --version | head -1
+
+      - name: 构建（系统 Qt 5.15.2）
+        env:
+          QT_MAJOR: "5"
+          PREFIX: ${{ github.workspace }}/dist/linux-kylin-native
+          BUILD_DIR: ${{ github.workspace }}/build/linux-kylin-native
+        run: bash scripts/build_linux.sh
+
+      - name: 冒烟测试（优先真实 X，回退 offscreen）
+        run: |
+          cd dist/linux-kylin-native/bin
+          if [ -n "${DISPLAY:-}" ]; then
+            echo "使用已有 DISPLAY=$DISPLAY"
+            ./caddemo --selftest
+          elif command -v xvfb-run >/dev/null 2>&1; then
+            echo "使用 xvfb-run 虚拟显示"
+            xvfb-run -a ./caddemo --selftest
+          else
+            echo "无 X 环境，使用 offscreen"
+            QT_QPA_PLATFORM=offscreen ./caddemo --selftest
+          fi
+          echo "✅ 麒麟本机 selftest 通过"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: caddemo-kylin-native-x86_64
+          path: dist/linux-kylin-native.tar.gz
+          retention-days: 30

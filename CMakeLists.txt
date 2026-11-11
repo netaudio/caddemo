@@ -16,13 +16,44 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# Qt 6.7.3 (msvc2019_64)。可通过命令行 -DQT_ROOT=... 覆盖
-if(NOT DEFINED QT_ROOT)
-    set(QT_ROOT "C:/Qt/6.7.3/msvc2019_64" CACHE PATH "Qt 6.7.3 安装根目录")
+# ---------------------------------------------------------------------------
+# Qt 版本策略：Windows 与麒麟刻意使用不同的 Qt
+#
+#   Windows —— Qt 6.7.3（msvc2019_64）
+#              开发环境既定版本，界面与各绘图/编辑命令均在此验证。
+#
+#   麒麟 V10 —— Qt 5.15.2（LTS）
+#              麒麟系统源自带、由麒麟官方适配维护的版本（qmake 3.1）。
+#              不用 Qt 6.7 的原因：Qt 6.7 官方 Linux 包需要 GLIBCXX_3.4.28，
+#              而麒麟 V10 自带 GCC 7.3 的 libstdc++ 只到 3.4.24，直接运行会报
+#              "GLIBCXX_3.4.28 not found"；麒麟源里也没有 Qt6 包。
+#
+# 可用 -DQT_MAJOR=6 / -DQT_MAJOR=5 显式覆盖。
+# 源码已做双版本兼容（见 CadInputParser.cpp 中 SkipEmptyParts 的处理）。
+# ---------------------------------------------------------------------------
+if(NOT DEFINED QT_MAJOR)
+    if(WIN32)
+        set(QT_MAJOR 6 CACHE STRING "Qt 主版本：6=Windows 开发环境，5=麒麟系统 Qt")
+    else()
+        set(QT_MAJOR 5 CACHE STRING "Qt 主版本：6=Windows 开发环境，5=麒麟系统 Qt")
+    endif()
 endif()
-list(PREPEND CMAKE_PREFIX_PATH "${QT_ROOT}")
+message(STATUS "CadDemo: 使用 Qt${QT_MAJOR}")
 
-find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets)
+# Qt 安装根目录：仅 Windows + Qt6 需要显式指定；Linux 走系统路径由 find_package 自行解析
+if(NOT DEFINED QT_ROOT AND WIN32 AND QT_MAJOR EQUAL 6)
+    set(QT_ROOT "C:/Qt/6.7.3/msvc2019_64" CACHE PATH "Qt 安装根目录")
+endif()
+if(DEFINED QT_ROOT AND NOT "${QT_ROOT}" STREQUAL "")
+    list(PREPEND CMAKE_PREFIX_PATH "${QT_ROOT}")
+endif()
+
+if(QT_MAJOR EQUAL 6)
+    find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets)
+else()
+    # 5.12 是下限：Ubuntu 20.04 仓库即为此版本，麒麟源自带 5.15.2
+    find_package(Qt5 5.12 REQUIRED COMPONENTS Core Gui Widgets)
+endif()
 
 # ---------------------------------------------------------------------------
 # 客户端目标（阶段 4：DXF/Part2D 文件读写 + 右侧工件树联动）
@@ -67,10 +98,19 @@ set(CADDEMO_HEADERS
     src/common/CadGeometry.h
 )
 
-qt_add_executable(caddemo WIN32
-    ${CADDEMO_SOURCES}
-    ${CADDEMO_HEADERS}
-)
+# qt_add_executable 是 Qt6 专有命令；Qt5 用普通 add_executable，
+# moc/uic 由上面开启的 CMAKE_AUTOMOC / CMAKE_AUTOUIC 处理。
+if(QT_MAJOR EQUAL 6)
+    qt_add_executable(caddemo WIN32
+        ${CADDEMO_SOURCES}
+        ${CADDEMO_HEADERS}
+    )
+else()
+    add_executable(caddemo WIN32
+        ${CADDEMO_SOURCES}
+        ${CADDEMO_HEADERS}
+    )
+endif()
 
 target_include_directories(caddemo PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -79,9 +119,9 @@ target_include_directories(caddemo PRIVATE
 )
 
 target_link_libraries(caddemo PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
+    Qt${QT_MAJOR}::Core
+    Qt${QT_MAJOR}::Gui
+    Qt${QT_MAJOR}::Widgets
 )
 
 if(MSVC)
@@ -100,4 +140,24 @@ if(WINDEPLOYQT_EXE AND WIN32)
                 --no-opengl-sw "$<TARGET_FILE:caddemo>"
         COMMENT "Deploying Qt runtime libraries..."
         VERBATIM)
+endif()
+
+# ---------------------------------------------------------------------------
+# 安装规则（Linux / 麒麟等信创环境出包用；Windows 仍由 windeployqt 处理）
+#   cmake --install build/linux --prefix <dir>   →  <dir>/bin/caddemo
+# ---------------------------------------------------------------------------
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    install(TARGETS caddemo RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    # 附带示例文件，方便在目标机上验证文件读写链路
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/preview/"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/caddemo/samples
+            OPTIONAL
+            FILES_MATCHING PATTERN "*.dxf" PATTERN "*.part2d")
+
+    # 把 Qt 依赖清单导出，出包脚本据此收集 .so 与插件
+    install(CODE "
+        file(WRITE \"\${CMAKE_INSTALL_PREFIX}/qt-deps.txt\" \"Qt${QT_MAJOR} ${QT_ROOT}\\n\")
+    ")
 endif()
