@@ -22,7 +22,7 @@ bool CadDocument::insertEntity(const cad::Entity& entity)
     if (copy.id <= 0)
         copy.id = m_nextId++;
     else
-        m_nextId = std::max(m_nextId, copy.id + 1);
+        m_nextId = std::max<qint64>(m_nextId, static_cast<qint64>(copy.id + 1));
     // 同一 id 不重复插入
     if (find(copy.id))
         return false;
