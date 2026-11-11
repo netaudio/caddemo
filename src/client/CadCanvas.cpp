@@ -19,6 +19,14 @@
 #include <algorithm>
 #include <cmath>
 
+// Qt5/Qt6 兼容：QMouseEvent::position() / QWheelEvent::position() 是 Qt6 新 API，
+// Qt5 中对应 pos()（返回 QPoint），统一转换为 QPointF 使用
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#define MOUSE_POS_F(event) ((event)->position())   // Qt6: QPointF
+#else
+#define MOUSE_POS_F(event) (QPointF((event)->pos())) // Qt5: QPoint -> QPointF
+#endif
+
 namespace {
 constexpr double kPickTolerancePx = 7.0;   // 拾取半径（屏幕像素）
 constexpr double kZoomStep = 1.25;
@@ -297,7 +305,7 @@ qint64 CadCanvas::hitTest(const QPointF& screenPos) const
 
 void CadCanvas::mousePressEvent(QMouseEvent* event)
 {
-    const QPointF pos = event->position();
+    const QPointF pos = MOUSE_POS_F(event);
 
     // 绘图命令进行中：左键收集点位 / 拾取对象，右键结束命令
     if (m_drawController && m_drawController->isActive()) {
@@ -371,7 +379,7 @@ void CadCanvas::mousePressEvent(QMouseEvent* event)
 
 void CadCanvas::mouseMoveEvent(QMouseEvent* event)
 {
-    const QPointF pos = event->position();
+    const QPointF pos = MOUSE_POS_F(event);
     const cad::Vec2 world = m_view.toWorld(pos, viewport());
     emit cursorMoved(world.x, world.z);
     if (m_drawController && m_drawController->isActive())
@@ -397,7 +405,7 @@ void CadCanvas::mouseReleaseEvent(QMouseEvent* event)
         setCursor(m_interaction == Interaction::Pan ? Qt::OpenHandCursor : Qt::ArrowCursor);
     }
     if (m_rubberBand && event->button() == Qt::LeftButton) {
-        m_rubberEnd = event->position();
+        m_rubberEnd = MOUSE_POS_F(event);
         m_rubberBand = false;
         applyZoomWindow(QRectF(m_rubberStart, m_rubberEnd));
     }
@@ -409,7 +417,7 @@ void CadCanvas::wheelEvent(QWheelEvent* event)
     const double notches = event->angleDelta().y() / 120.0;
     if (qFuzzyIsNull(notches))
         return;
-    m_view.zoomAt(event->position(), std::pow(kZoomStep, notches), viewport());
+    m_view.zoomAt(MOUSE_POS_F(event), std::pow(kZoomStep, notches), viewport());
     update();
     emit viewChanged(m_view.scale);
     event->accept();
