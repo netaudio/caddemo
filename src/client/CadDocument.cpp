@@ -104,6 +104,16 @@ void CadDocument::setSelection(const QSet<qint64>& ids)
     emit selectionChanged();
 }
 
+void CadDocument::setEntityVisible(qint64 id, bool visible)
+{
+    if (cad::Entity* target = find(id)) {
+        if (target->visible != visible) {
+            target->visible = visible;
+            emit changed();
+        }
+    }
+}
+
 void CadDocument::clearSelection()
 {
     if (m_selection.isEmpty())

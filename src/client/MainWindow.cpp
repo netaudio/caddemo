@@ -4,10 +4,15 @@
 #include "CadCommands.h"
 #include "CadDocument.h"
 #include "CadDrawController.h"
+#include "CadDxf.h"
+#include "CadEditController.h"
+#include "CadEntityTree.h"
 #include "CadIcons.h"
+#include "CadPartFile.h"
 #include "RibbonBar.h"
 
 #include <QApplication>
+#include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -82,6 +87,8 @@ MainWindow::MainWindow(QWidget* parent)
     m_undo = new QUndoStack(this);
     m_drawController = new CadDrawController(m_document, m_canvas, m_undo, this);
     m_canvas->setDrawController(m_drawController);
+    m_editController = new CadEditController(m_document, m_canvas, m_undo, this);
+    m_canvas->setEditController(m_editController);
     m_splitter->addWidget(m_canvas);
     m_splitter->addWidget(buildRightArea());
     m_splitter->setStretchFactor(0, 0);
@@ -101,6 +108,10 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_drawController, &CadDrawController::statusMessage,
             this, &MainWindow::onCanvasStatus);
     connect(m_drawController, &CadDrawController::toolChanged,
+            this, &MainWindow::onToolChanged);
+    connect(m_editController, &CadEditController::statusMessage,
+            this, &MainWindow::onCanvasStatus);
+    connect(m_editController, &CadEditController::toolChanged,
             this, &MainWindow::onToolChanged);
 
     // Esc 全局结束绘图命令；命令栏有焦点时先清空输入
@@ -307,16 +318,13 @@ QWidget* MainWindow::buildRightArea()
     auto* boxLayout = new QVBoxLayout(planBox);
     boxLayout->setContentsMargins(4, 4, 4, 4);
 
-    auto* tree = new QTreeWidget(planBox);
-    tree->setObjectName(QStringLiteral("planTree"));
-    tree->setHeaderHidden(true);
-    tree->setFrameShape(QFrame::NoFrame);
-    tree->setRootIsDecorated(false);
-    auto* rootItem = new QTreeWidgetItem(tree);
-    rootItem->setText(0, QStringLiteral("— 工件"));
-    tree->addTopLevelItem(rootItem);
-    boxLayout->addWidget(tree);
+    m_entityTree = new CadEntityTree(m_document, planBox);
+    m_entityTree->setObjectName(QStringLiteral("planTree"));
+    boxLayout->addWidget(m_entityTree);
     boxLayout->addStretch(1);
+
+    connect(m_entityTree, &CadEntityTree::deleteRequested,
+            this, &MainWindow::deleteFromTree);
 
     panelLayout->addWidget(panelTitle);
     panelLayout->addWidget(planBox, 1);
@@ -376,13 +384,23 @@ QWidget* MainWindow::buildStatusBar()
 // ---------------------------------------------------------------------------
 void MainWindow::onCommand(const QString& command)
 {
-    // 14 个绘图命令：交给状态机，按钮高亮由 toolChanged 信号刷新
-    if (m_drawController->startCommand(command))
+    // 14 个绘图命令：交给绘图状态机
+    if (m_drawController->startCommand(command)) {
+        if (m_editController->isActive())
+            m_editController->cancel();
         return;
-
-    // 点击其它功能按钮等价于结束当前绘图命令
+    }
+    // 编辑 / 工具命令：交给编辑状态机
+    if (m_editController->startCommand(command)) {
+        if (m_drawController->isActive())
+            m_drawController->cancel();
+        return;
+    }
+    // 点击其它功能按钮：结束任何进行中的命令
     if (m_drawController->isActive())
         m_drawController->cancel();
+    if (m_editController->isActive())
+        m_editController->cancel();
     m_ribbon->setActiveCommand({});
 
     if (command == QStringLiteral("放大")) {
@@ -425,15 +443,62 @@ void MainWindow::onCommand(const QString& command)
         deleteSelection();
         return;
     }
+    if (command == QStringLiteral("颜色") || command == QStringLiteral("线型")
+        || command == QStringLiteral("线宽")) {
+        applyStyleToSelection(command);
+        return;
+    }
+
+    // 阶段 4：文件读写
+    if (command == QStringLiteral("打开dxf")) { openDxfFile(); return; }
+    if (command == QStringLiteral("打开Part")) { openPartFile(); return; }
+    if (command == QStringLiteral("保存Part")) { savePartFile(false); return; }
+    if (command == QStringLiteral("另存Part")) { savePartFile(true); return; }
 
     m_hintLabel->setText(
-        QStringLiteral("命令：%1  —  将在阶段 3/4 接入编辑与文件逻辑").arg(command));
+        QStringLiteral("命令：%1  —  将在阶段 5 接入特定功能逻辑").arg(command));
 }
 
 void MainWindow::onToolChanged()
 {
-    m_ribbon->setActiveCommand(m_drawController->isActive()
-                                   ? m_drawController->label() : QString());
+    QString active;
+    if (m_drawController->isActive())
+        active = m_drawController->label();
+    else if (m_editController->isActive())
+        active = m_editController->label();
+    m_ribbon->setActiveCommand(active);
+}
+
+void MainWindow::applyStyleToSelection(const QString& which)
+{
+    const QSet<qint64> ids = m_document->selection();
+    if (ids.isEmpty()) {
+        m_hintLabel->setText(
+            QStringLiteral("%1：请先选中图元；未选中时该样式将作为新建图元默认样式")
+                .arg(which));
+        return;
+    }
+    QVector<cad::Entity> before, after;
+    for (qint64 id : ids) {
+        const cad::Entity* e = m_document->find(id);
+        if (!e)
+            continue;
+        cad::Entity a = *e;
+        if (which == QStringLiteral("颜色"))
+            a.color = m_document->currentColor();
+        else if (which == QStringLiteral("线型"))
+            a.lineType = m_document->currentLineType();
+        else if (which == QStringLiteral("线宽"))
+            a.lineWidth = m_document->currentLineWidth();
+        before.append(*e);
+        after.append(a);
+    }
+    if (after.isEmpty())
+        return;
+    m_undo->push(new cadcmd::ModifyEntities(m_document, before, after, which));
+    m_hintLabel->setText(
+        QStringLiteral("%1：已将 %2 个选中图元的%3设为当前默认值（可撤销）")
+            .arg(which).arg(after.size()).arg(which));
 }
 
 void MainWindow::deleteSelection()
@@ -453,6 +518,85 @@ void MainWindow::deleteSelection()
     m_document->clearSelection();
     m_hintLabel->setText(QStringLiteral("删除：已移除 %1 个图元（可用「撤销」恢复）")
                              .arg(entities.size()));
+}
+
+void MainWindow::deleteFromTree(const QList<qint64>& ids)
+{
+    if (ids.isEmpty())
+        return;
+    QVector<cad::Entity> entities;
+    for (qint64 id : ids) {
+        if (const cad::Entity* e = m_document->find(id))
+            entities.append(*e);
+    }
+    if (entities.isEmpty())
+        return;
+    m_undo->push(new cadcmd::RemoveEntities(m_document, entities,
+                                            QStringLiteral("删除图元")));
+    m_document->clearSelection();
+    m_hintLabel->setText(QStringLiteral("删除：已移除 %1 个图元（可用「撤销」恢复）")
+                             .arg(entities.size()));
+}
+
+void MainWindow::openPartFile()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("打开 Part2D 文件"), QString(),
+        QStringLiteral("Part2D 文件 (*.part2d *.json);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    if (!cadfile::loadPart(path, m_document)) {
+        m_hintLabel->setText(QStringLiteral("打开Part：文件读取失败"));
+        return;
+    }
+    m_undo->clear();
+    m_currentFile = path;
+    m_currentFormat = QStringLiteral("part2d");
+    m_canvas->zoomFit();
+    m_hintLabel->setText(QStringLiteral("打开Part：已载入 %1 个图元（%2）")
+                             .arg(m_document->count()).arg(path));
+}
+
+void MainWindow::openDxfFile()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("打开 DXF 文件"), QString(),
+        QStringLiteral("DXF 文件 (*.dxf);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    if (!cadfile::importDxf(path, m_document)) {
+        m_hintLabel->setText(QStringLiteral("打开dxf：文件读取失败"));
+        return;
+    }
+    m_undo->clear();
+    m_currentFile = path;
+    m_currentFormat = QStringLiteral("dxf");
+    m_canvas->zoomFit();
+    m_hintLabel->setText(QStringLiteral("打开dxf：已导入 %1 个图元（%2）")
+                             .arg(m_document->count()).arg(path));
+}
+
+void MainWindow::savePartFile(bool asCopy)
+{
+    QString path = m_currentFile;
+    if (asCopy || path.isEmpty() || m_currentFormat != QLatin1String("part2d")) {
+        path = QFileDialog::getSaveFileName(
+            this, QStringLiteral("保存 Part2D 文件"),
+            m_currentFile.isEmpty() ? QStringLiteral("未命名.part2d") : m_currentFile,
+            QStringLiteral("Part2D 文件 (*.part2d)"));
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QStringLiteral(".part2d"), Qt::CaseInsensitive))
+            path += QStringLiteral(".part2d");
+    }
+    if (cadfile::savePart(path, m_document)) {
+        m_currentFile = path;
+        m_currentFormat = QStringLiteral("part2d");
+        m_hintLabel->setText(QStringLiteral("保存Part：已写出 %1 个图元（%2）")
+                                 .arg(m_document->count()).arg(path));
+    } else {
+        m_hintLabel->setText(QStringLiteral("保存Part：写入失败"));
+    }
 }
 
 void MainWindow::onPropertyChanged(const QString& name, const QString& value)
@@ -495,6 +639,8 @@ void MainWindow::onCommandEntered()
     }
     // 活动命令中：输入被解释为点位 / 数值 / 文本参数
     if (m_drawController->handleInput(input))
+        return;
+    if (m_editController->handleInput(input))
         return;
     // 空闲时：把输入当作命令名（含 U 撤销、视图命令等）
     if (input.compare(QStringLiteral("U"), Qt::CaseInsensitive) == 0)

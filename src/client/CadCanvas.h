@@ -7,6 +7,7 @@
 
 class CadDocument;
 class CadDrawController;
+class CadEditController;
 class QKeyEvent;
 class QPainter;
 
@@ -25,6 +26,8 @@ public:
     CadDocument* document() const { return m_document; }
     void setDrawController(CadDrawController* controller);
     CadDrawController* drawController() const { return m_drawController; }
+    void setEditController(CadEditController* controller);
+    CadEditController* editController() const { return m_editController; }
 
     const CadViewTransform& view() const { return m_view; }
 
@@ -74,6 +77,7 @@ private:
 
     CadDocument*        m_document = nullptr;
     CadDrawController*  m_drawController = nullptr;
+    CadEditController*  m_editController = nullptr;
     CadViewTransform  m_view;
     Interaction       m_interaction = Interaction::Select;
     bool              m_gridVisible = false;

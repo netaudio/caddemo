@@ -34,6 +34,9 @@ public:
     void setSelection(const QSet<qint64>& ids);
     void clearSelection();
 
+    // 图元显隐（工件树勾选切换，不进撤销栈）
+    void setEntityVisible(qint64 id, bool visible);
+
     // 当前绘图属性：阶段 2 的绘图命令创建图元时套用
     cad::ColorIndex currentColor() const { return m_color; }
     cad::LineType   currentLineType() const { return m_lineType; }
@@ -41,6 +44,9 @@ public:
     void setCurrentColor(cad::ColorIndex color);
     void setCurrentLineType(cad::LineType type);
     void setCurrentLineWidth(double width);
+
+    qint64 nextId() const { return m_nextId; }
+    void   setNextId(qint64 id) { m_nextId = id; }
 
 signals:
     void changed();

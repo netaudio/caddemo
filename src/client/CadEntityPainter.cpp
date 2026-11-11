@@ -56,13 +56,32 @@ void drawEntity(QPainter& painter, const cad::Entity& entity,
         break;
     }
     case cad::EntityType::Line:
-    case cad::EntityType::Curve:
-    case cad::EntityType::Dimension: {
+    case cad::EntityType::Curve: {
         QPainterPath path;
         path.moveTo(p0);
         for (std::size_t i = 1; i < entity.points.size(); ++i)
             path.lineTo(view.toScreen(entity.points[i], viewport));
         painter.drawPath(path);
+        break;
+    }
+    case cad::EntityType::Dimension: {
+        if (entity.points.size() >= 2) {
+            const QPointF a = view.toScreen(entity.points[0], viewport);
+            const QPointF b = view.toScreen(entity.points[1], viewport);
+            painter.drawLine(a, b);
+            const QPointF dir = b - a;
+            const double len = std::hypot(dir.x(), dir.y());
+            if (len > 1.0) {
+                const QPointF u = dir / len;
+                const QPointF perp(-u.y(), u.x());
+                painter.drawLine(a, a + perp * 5.0);
+                painter.drawLine(b, b + perp * 5.0);
+            }
+            QFont font(QStringLiteral("Microsoft YaHei"));
+            font.setPixelSize(std::clamp(static_cast<int>(entity.textHeight * view.scale), 8, 96));
+            painter.setFont(font);
+            painter.drawText((a + b) / 2.0 + QPointF(4, -4), QString::fromStdString(entity.text));
+        }
         break;
     }
     case cad::EntityType::Rectangle: {

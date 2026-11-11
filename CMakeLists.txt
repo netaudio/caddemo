@@ -25,9 +25,9 @@ list(PREPEND CMAKE_PREFIX_PATH "${QT_ROOT}")
 find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets)
 
 # ---------------------------------------------------------------------------
-# 客户端目标（阶段 2：绘图命令状态机）
+# 客户端目标（阶段 4：DXF/Part2D 文件读写 + 右侧工件树联动）
 # 目录按 C/S 架构分层：
-#   src/client/  —— 客户端界面、图元文档、渲染、命令状态机与交互
+#   src/client/  —— 客户端界面、图元文档、渲染、绘图与编辑命令状态机、交互
 #   src/common/  —— 客户端/服务端共享的命令、图元模型与几何工具
 #   src/server/  —— 服务端（后续阶段实现）
 # ---------------------------------------------------------------------------
@@ -41,7 +41,11 @@ set(CADDEMO_SOURCES
     src/client/CadCommands.cpp
     src/client/CadInputParser.cpp
     src/client/CadDrawController.cpp
+    src/client/CadEditController.cpp
     src/client/CadIcons.cpp
+    src/client/CadPartFile.cpp
+    src/client/CadDxf.cpp
+    src/client/CadEntityTree.cpp
 )
 
 set(CADDEMO_HEADERS
@@ -54,7 +58,11 @@ set(CADDEMO_HEADERS
     src/client/CadCommands.h
     src/client/CadInputParser.h
     src/client/CadDrawController.h
+    src/client/CadEditController.h
     src/client/CadIcons.h
+    src/client/CadPartFile.h
+    src/client/CadDxf.h
+    src/client/CadEntityTree.h
     src/common/CadProtocol.h
     src/common/CadGeometry.h
 )

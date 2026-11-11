@@ -67,6 +67,7 @@ struct Entity {
     ColorIndex          color = ColorIndex::Black;
     LineType            lineType = LineType::Solid;
     double              lineWidth = 0.0;  // 0 = 使用默认细线
+    bool                visible = true;   // 工件树可切换显隐
 };
 
 // 命令请求：例如客户端发出 "line" + 两个点，服务端校验后返回图元 id

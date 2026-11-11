@@ -3,6 +3,9 @@
 #include "client/CadCanvas.h"
 #include "client/CadDocument.h"
 #include "client/CadDrawController.h"
+#include "client/CadEditController.h"
+#include "client/CadPartFile.h"
+#include "client/CadDxf.h"
 
 #include <QApplication>
 #include <QComboBox>
@@ -153,6 +156,7 @@ int main(int argc, char* argv[])
                 // --- 视图 / 选项卡 / 属性 / 面板交互 ---
                 window.canvas()->zoomFit();
                 click(QStringLiteral("放大"));
+                click(QStringLiteral("缩小"));
                 click(QStringLiteral("开始"));
                 click(QStringLiteral("CAD绘制"));
                 click(QStringLiteral("›"));
@@ -160,16 +164,196 @@ int main(int argc, char* argv[])
                     if (combo->currentText() == QStringLiteral("XZ"))
                         combo->setCurrentIndex(1);   // 坐标系 -> XY
                 }
+                // 结束阶段 2 残留的演示命令
+                controller->cancel();
+                if (window.editController()->isActive())
+                    window.editController()->cancel();
 
                 // 撤销最后一次圆角宏，验证 QUndoStack 生效
-                const int before = document->count();
+                const int beforeUndo = document->count();
                 if (window.undoStack()->canUndo())
                     window.undoStack()->undo();
-                const int after = document->count();
+                const int afterUndo = document->count();
+
+                // ============ 阶段 3：编辑 / 工具命令验证（独立分区 + 文字标注）============
+                CadEditController* editor = window.editController();
+                auto epoint = [editor](double x, double z, qint64 hit = 0) {
+                    editor->onPoint({x, z}, hit);
+                };
+                auto label = [&](double x, double z, const QString& t) {
+                    if (editor->isActive())
+                        editor->cancel();
+                    controller->startCommand(QStringLiteral("文本"));
+                    point(x, z);
+                    controller->handleInput(t);
+                    controller->cancel();
+                };
+                window.document()->setSelection({});
+
+                // 4 列 x 2 行网格，每个格子独立演示一种编辑，远离阶段 2 图形
+                const double colX[4] = {300.0, 400.0, 500.0, 600.0};
+                const double rowZ[2] = {70.0, -40.0};
+
+                label(300, 150, QStringLiteral("阶段3 · 编辑/工具命令验证"));
+
+                // 单元格 1：偏移 —— 原始水平线 + 向上偏移副本
+                {
+                    const qint64 a = drawLine(colX[0]-30, rowZ[0], colX[0]+30, rowZ[0]);
+                    click(QStringLiteral("偏移"));
+                    epoint(colX[0], rowZ[0], a);
+                    editor->handleInput(QStringLiteral("D=20"));
+                    label(colX[0], rowZ[0]+34, QStringLiteral("偏移"));
+                }
+                // 单元格 2：修剪 —— 十字交叉，左段被剪
+                {
+                    const qint64 h = drawLine(colX[1]-30, rowZ[0], colX[1]+30, rowZ[0]);
+                    const qint64 v = drawLine(colX[1], rowZ[0]+25, colX[1], rowZ[0]-25);
+                    click(QStringLiteral("修剪"));
+                    epoint(colX[1], rowZ[0], v);       // 边界（竖线）
+                    epoint(colX[1]-20, rowZ[0], h);    // 目标 + 要剪掉的一侧（左）
+                    label(colX[1], rowZ[0]+34, QStringLiteral("修剪"));
+                }
+                // 单元格 3：延伸 —— 短竖线向下延伸到水平边界
+                {
+                    const qint64 b = drawLine(colX[2]-25, rowZ[0], colX[2]+25, rowZ[0]);
+                    const qint64 s = drawLine(colX[2], rowZ[0], colX[2], rowZ[0]+25);
+                    click(QStringLiteral("延伸"));
+                    epoint(colX[2], rowZ[0], b);       // 边界（横线）
+                    epoint(colX[2], rowZ[0]+10, s);    // 目标（短竖线）
+                    label(colX[2], rowZ[0]+34, QStringLiteral("延伸"));
+                }
+                // 单元格 4：箭头 —— 带 V 形箭头的直线
+                {
+                    const qint64 ar = drawLine(colX[3]-30, rowZ[0], colX[3]+30, rowZ[0]);
+                    window.document()->setSelection({ar});
+                    click(QStringLiteral("箭头"));
+                    label(colX[3], rowZ[0]+34, QStringLiteral("箭头"));
+                }
+                // 单元格 5：平移 —— 原始 + 上移后的线
+                {
+                    const qint64 m = drawLine(colX[0]-30, rowZ[1], colX[0]+30, rowZ[1]);
+                    window.document()->setSelection({m});
+                    click(QStringLiteral("平移"));
+                    epoint(colX[0], rowZ[1]);
+                    epoint(colX[0], rowZ[1]+30);
+                    label(colX[0], rowZ[1]-22, QStringLiteral("平移"));
+                }
+                // 单元格 6：对称 —— 原始 + 水平镜像副本
+                {
+                    const qint64 mi = drawLine(colX[1]-30, rowZ[1], colX[1]+30, rowZ[1]);
+                    window.document()->setSelection({mi});
+                    click(QStringLiteral("对称"));
+                    epoint(colX[1]-30, rowZ[1]-20);
+                    epoint(colX[1]+30, rowZ[1]-20);    // 镜像线（水平）
+                    label(colX[1], rowZ[1]-44, QStringLiteral("对称"));
+                }
+                // 单元格 7：标注 —— 两点尺寸线 + 长度文字
+                {
+                    click(QStringLiteral("标注"));
+                    epoint(colX[2]-30, rowZ[1]);
+                    epoint(colX[2]+30, rowZ[1]);
+                    label(colX[2], rowZ[1]-22, QStringLiteral("标注"));
+                }
+                // 单元格 8：颜色 —— 红色直线（先切下拉框，再应用到选中）
+                {
+                    const qint64 c = drawLine(colX[3]-30, rowZ[1], colX[3]+30, rowZ[1]);
+                    for (QComboBox* combo : window.findChildren<QComboBox*>()) {
+                        if (combo->currentText() == QStringLiteral("黑"))
+                            combo->setCurrentIndex(1);   // 颜色 -> 红
+                    }
+                    window.document()->setSelection({c});
+                    click(QStringLiteral("颜色"));
+                    label(colX[3], rowZ[1]-22, QStringLiteral("颜色"));
+                }
+
+                // 收尾：结束命令并适配视图
+                controller->cancel();
+                if (editor->isActive())
+                    editor->cancel();
+                // 展开右侧面板（阶段 2 自测中曾折叠），让截图能展示工件树
+                for (QToolButton* b : window.findChildren<QToolButton*>()) {
+                    if (b->objectName() == QStringLiteral("collapseButton")) {
+                        b->click();
+                        break;
+                    }
+                }
+                window.canvas()->zoomFit();
+
+                // ============ 阶段 4：文件读写验证（Part2D / DXF 往返） ============
+                int stage4Src = 0, stage4Part = -1, stage4Dxf = -1;
+                {
+                    CadDocument tmp;
+                    auto mkLine = [&](double x1, double z1, double x2, double z2,
+                                     cad::ColorIndex c) {
+                        cad::Entity e; e.type = cad::EntityType::Line;
+                        e.points = {{x1, z1}, {x2, z2}}; e.color = c; tmp.addEntity(e);
+                    };
+                    auto mkCircle = [&](double x, double z, double r, cad::ColorIndex c) {
+                        cad::Entity e; e.type = cad::EntityType::Circle;
+                        e.points = {{x, z}}; e.radius = r; e.color = c; tmp.addEntity(e);
+                    };
+                    auto mkArc = [&](double x, double z, double r, double a0, double a1,
+                                    cad::ColorIndex c) {
+                        cad::Entity e; e.type = cad::EntityType::Arc;
+                        e.points = {{x, z}}; e.radius = r;
+                        e.startAngle = a0; e.endAngle = a1; e.color = c; tmp.addEntity(e);
+                    };
+                    auto mkText = [&](double x, double z, const QString& t, double h) {
+                        cad::Entity e; e.type = cad::EntityType::Text;
+                        e.points = {{x, z}}; e.textHeight = h;
+                        e.text = t.toStdString(); tmp.addEntity(e);
+                    };
+                    auto mkCurve = [&](const std::vector<cad::Vec2>& v) {
+                        cad::Entity e; e.type = cad::EntityType::Curve;
+                        e.points = v; tmp.addEntity(e);
+                    };
+                    auto mkRect = [&](double x1, double z1, double x2, double z2) {
+                        cad::Entity e; e.type = cad::EntityType::Rectangle;
+                        e.points = {{x1, z1}, {x2, z2}}; tmp.addEntity(e);
+                    };
+                    auto mkPoint = [&](double x, double z) {
+                        cad::Entity e; e.type = cad::EntityType::Point;
+                        e.points = {{x, z}}; tmp.addEntity(e);
+                    };
+                    auto mkConc = [&](double x, double z, double r) {
+                        cad::Entity e; e.type = cad::EntityType::Concentric;
+                        e.points = {{x, z}}; e.radius = r; tmp.addEntity(e);
+                    };
+
+                    mkLine(-10, -10, 10, 10, cad::ColorIndex::Red);
+                    mkCircle(0, 0, 30, cad::ColorIndex::Blue);
+                    mkArc(40, 0, 20, 0, 90, cad::ColorIndex::Green);
+                    mkText(0, 40, QStringLiteral("阶段4"), 8.0);
+                    mkCurve({{-50, 0}, {-30, 20}, {-10, 0}, {10, 20}});
+                    mkRect(-60, -40, -20, -10);
+                    mkPoint(60, 60);
+                    mkConc(80, 0, 25);
+                    stage4Src = tmp.count();
+
+                    const QString partP = QStringLiteral("E:/test/caddemo/preview/stage4_demo.part2d");
+                    const QString dxfP  = QStringLiteral("E:/test/caddemo/preview/stage4_demo.dxf");
+
+                    const bool pOk = cadfile::savePart(partP, &tmp);
+                    CadDocument loaded; const bool lOk = cadfile::loadPart(partP, &loaded);
+                    const int lc = loaded.count();
+                    const bool dOk = cadfile::exportDxf(dxfP, &tmp);
+                    CadDocument imp; const bool iOk = cadfile::importDxf(dxfP, &imp);
+                    const int ic = imp.count();
+
+                    stage4Part = (pOk && lOk && lc == stage4Src) ? lc : -1;
+                    stage4Dxf  = (dOk && iOk && ic == stage4Src) ? ic : -1;
+
+                    // 把真实工程文档也导出成 Part2D，证明保存可用
+                    cadfile::savePart(QStringLiteral("E:/test/caddemo/preview/stage4_main.part2d"),
+                                      window.document());
+                }
+
                 if (QLabel* hint = window.findChild<QLabel*>(QStringLiteral("statusHint"))) {
                     hint->setText(
-                        QStringLiteral("阶段2冒烟测试：14 类绘图命令全部执行  ·  图元 %1 → 撤销后 %2  ·  坐标系 XY  ·  视图/面板联动正常")
-                            .arg(before).arg(after));
+                        QStringLiteral("阶段3：偏移/修剪/延伸/箭头/平移/对称/标注/颜色已执行 · 撤销 %1→%2 · XY\n"
+                                       "阶段4：Part2D 往返 %3/%5 · DXF 往返 %4/%5")
+                            .arg(beforeUndo).arg(afterUndo)
+                            .arg(stage4Part).arg(stage4Dxf).arg(stage4Src));
                 }
             });
         }

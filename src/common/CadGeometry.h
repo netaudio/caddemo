@@ -440,4 +440,428 @@ inline double distanceToEntity(const Vec2& p, const Entity& entity)
     return best;
 }
 
+// ---------------------------------------------------------------------------
+// 编辑变换：直接修改图元副本（平移 / 旋转 / 缩放 / 镜像）
+// 供阶段 3 的编辑命令使用，全部在数学坐标（X-Z，Z 向上）下完成
+// ---------------------------------------------------------------------------
+inline Vec2 rotateAround(const Vec2& p, const Vec2& c, double deg)
+{
+    const double r = degToRad(deg);
+    const double cs = std::cos(r), sn = std::sin(r);
+    const Vec2 d = p - c;
+    return {c.x + d.x * cs - d.z * sn, c.z + d.x * sn + d.z * cs};
+}
+
+inline void transformTranslate(Entity& e, const Vec2& d)
+{
+    for (Vec2& p : e.points)
+        p = p + d;
+}
+
+inline void transformRotate(Entity& e, const Vec2& c, double deg)
+{
+    for (Vec2& p : e.points)
+        p = rotateAround(p, c, deg);
+    if (e.type == EntityType::Arc)
+        e.startAngle = wrap360(e.startAngle + deg);
+}
+
+inline void transformScale(Entity& e, const Vec2& c, double factor)
+{
+    for (Vec2& p : e.points)
+        p = c + (p - c) * factor;
+    if (e.type == EntityType::Circle || e.type == EntityType::Arc
+        || e.type == EntityType::Concentric) {
+        e.radius *= factor;
+        e.innerRadius *= factor;
+    }
+    if (e.type == EntityType::Text)
+        e.textHeight *= factor;
+}
+
+// 关于直线 a-b 镜像（反射）。圆弧通过反射起/中/末三点重建，保持方向正确
+inline void transformMirror(Entity& e, const Vec2& a, const Vec2& b)
+{
+    auto reflect = [a, b](Vec2 p) {
+        const Vec2 v = b - a;
+        const double den = dot(v, v);
+        if (den < kEps)
+            return p;
+        const double t = dot(p - a, v) / den;
+        return p - v * (2.0 * t);
+    };
+    for (Vec2& p : e.points)
+        p = reflect(p);
+    if (e.type == EntityType::Arc) {
+        const Vec2 c = e.points[0];
+        const double r = e.radius;
+        const double a1 = degToRad(e.startAngle);
+        const double am = degToRad(e.startAngle + (e.endAngle - e.startAngle) * 0.5);
+        const Vec2 s  = c + Vec2{r * std::cos(a1), r * std::sin(a1)};
+        const Vec2 m  = c + Vec2{r * std::cos(am), r * std::sin(am)};
+        const Vec2 en = c + Vec2{r * std::cos(degToRad(e.endAngle)),
+                                r * std::sin(degToRad(e.endAngle))};
+        ArcData arc = arcFrom3Points(reflect(s), reflect(m), reflect(en));
+        if (arc.valid) {
+            e.points[0] = arc.center;
+            e.radius = arc.radius;
+            e.startAngle = arc.startAngle;
+            e.endAngle = arc.startAngle + arc.span;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 偏移：生成与源图元平行/同心的新图元
+// ---------------------------------------------------------------------------
+inline std::vector<Vec2> offsetPolyline(const std::vector<Vec2>& pts, double dist,
+                                        bool left, bool closed = false)
+{
+    const int sgn = left ? 1 : -1;
+    const std::size_t n = pts.size();
+    if (n < 2)
+        return pts;
+    struct Seg { Vec2 a, b; };
+    std::vector<Seg> segs;
+    const std::size_t count = closed ? n : n - 1;
+    for (std::size_t i = 0; i < count; ++i) {
+        const Vec2 a = pts[i];
+        const Vec2 b = pts[(i + 1) % n];
+        const Vec2 dir = normalized(b - a);
+        const Vec2 normal = perp(dir) * (dist * sgn);
+        segs.push_back({a + normal, b + normal});
+    }
+    if (segs.size() == 1)
+        return {segs[0].a, segs[0].b};
+    std::vector<Vec2> result;
+    result.push_back(segs.front().a);
+    for (std::size_t i = 0; i + 1 < segs.size(); ++i) {
+        Vec2 join;
+        if (lineIntersection(segs[i].a, segs[i].b, segs[i + 1].a, segs[i + 1].b, join))
+            result.push_back(join);
+        else
+            result.push_back(segs[i].b);
+    }
+    result.push_back(segs.back().b);
+    if (closed) {
+        Vec2 join;
+        if (lineIntersection(segs.back().a, segs.back().b,
+                             segs.front().a, segs.front().b, join))
+            result.push_back(join);
+    }
+    return result;
+}
+
+inline bool offsetEntity(const Entity& src, double dist, bool left, Entity& out)
+{
+    out = src;
+    if (src.type == EntityType::Line || src.type == EntityType::Curve) {
+        if (src.points.size() < 2)
+            return false;
+        out.points = offsetPolyline(src.points, dist, left, false);
+        return out.points.size() >= 2;
+    }
+    if (src.type == EntityType::Rectangle) {
+        if (src.points.size() < 2)
+            return false;
+        const Vec2 a = src.points[0], c = src.points[1];
+        const Vec2 b{c.x, a.z}, d{a.x, c.z};
+        std::vector<Vec2> rect{a, b, c, d};
+        auto off = offsetPolyline(rect, dist, left, true);
+        if (off.size() < 4)
+            return false;
+        out.points = {off[0], off[2]};
+        return true;
+    }
+    if (src.type == EntityType::Circle || src.type == EntityType::Concentric) {
+        out.radius = std::max(0.0, src.radius + (left ? dist : -dist));
+        if (src.type == EntityType::Concentric)
+            out.innerRadius = std::max(0.0, src.innerRadius + (left ? dist : -dist));
+        return out.radius > 0.0;
+    }
+    if (src.type == EntityType::Arc) {
+        out.radius = std::max(0.0, src.radius + (left ? dist : -dist));
+        return out.radius > 0.0;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// 修剪 / 延伸：实体求交与裁切
+// ---------------------------------------------------------------------------
+inline bool pointOnSegment(const Vec2& p, const Vec2& a, const Vec2& b)
+{
+    const Vec2 ab = b - a, ap = p - a;
+    const double denom = dot(ab, ab);
+    if (denom < kEps)
+        return distance(p, a) < kEps * 10.0;
+    const double t = dot(ap, ab) / denom;
+    if (t < -kEps || t > 1.0 + kEps)
+        return false;
+    return distance(p, a + ab * t) < kEps * 10.0;
+}
+
+// 直线（无限延长）与圆的所有实交点，t 不裁剪
+inline std::vector<Vec2> lineCircleRaw(const Vec2& p1, const Vec2& p2,
+                                       const Vec2& c, double r)
+{
+    std::vector<Vec2> res;
+    const Vec2 d = p2 - p1;
+    const Vec2 f = p1 - c;
+    const double a = dot(d, d);
+    if (a < kEps)
+        return res;
+    const double b = 2.0 * dot(f, d);
+    const double cc = dot(f, f) - r * r;
+    double disc = b * b - 4.0 * a * cc;
+    if (disc < 0.0)
+        return res;
+    disc = std::sqrt(disc);
+    for (double t : {(-b - disc) / (2.0 * a), (-b + disc) / (2.0 * a)})
+        res.push_back(p1 + d * t);
+    return res;
+}
+
+// 两图元的所有交点：线段类裁剪到线段内，圆弧按角度过滤
+inline std::vector<Vec2> intersectPair(const Entity& a, const Entity& b)
+{
+    std::vector<Vec2> res;
+    const bool aLine = a.type == EntityType::Line || a.type == EntityType::Curve;
+    const bool bLine = b.type == EntityType::Line || b.type == EntityType::Curve;
+    const bool aC = a.type == EntityType::Circle || a.type == EntityType::Arc
+                 || a.type == EntityType::Concentric;
+    const bool bC = b.type == EntityType::Circle || b.type == EntityType::Arc
+                 || b.type == EntityType::Concentric;
+    if (aLine && bLine && a.points.size() >= 2 && b.points.size() >= 2) {
+        Vec2 p;
+        if (lineIntersection(a.points[0], a.points[1], b.points[0], b.points[1], p))
+            res.push_back(p);
+    } else if (aLine && bC && a.points.size() >= 2) {
+        const std::vector<Vec2> raw = lineCircleRaw(a.points[0], a.points[1],
+                                                    b.points[0], b.radius);
+        const bool arc = b.type == EntityType::Arc;
+        for (const Vec2& p : raw) {
+            if (!pointOnSegment(p, a.points[0], a.points[1]))
+                continue;
+            if (arc && !angleWithinArc(p, b.points[0], b.startAngle,
+                                       b.endAngle - b.startAngle))
+                continue;
+            res.push_back(p);
+        }
+    } else if (bLine && aC && b.points.size() >= 2) {
+        const std::vector<Vec2> raw = lineCircleRaw(b.points[0], b.points[1],
+                                                    a.points[0], a.radius);
+        const bool arc = a.type == EntityType::Arc;
+        for (const Vec2& p : raw) {
+            if (!pointOnSegment(p, b.points[0], b.points[1]))
+                continue;
+            if (arc && !angleWithinArc(p, a.points[0], a.startAngle,
+                                       a.endAngle - a.startAngle))
+                continue;
+            res.push_back(p);
+        }
+    }
+    return res;
+}
+
+// 用 cutting 图元修剪 target 线段，丢弃靠近 pick 的那一端
+inline bool trimLineAt(const Entity& target, const Entity& cutting,
+                       const Vec2& pick, Entity& out)
+{
+    if (target.type != EntityType::Line || target.points.size() < 2)
+        return false;
+    const std::vector<Vec2> pts = intersectPair(target, cutting);
+    if (pts.empty())
+        return false;
+    Vec2 best;
+    double bestD = 1e12;
+    for (const Vec2& p : pts) {
+        const double dd = distance(p, pick);
+        if (dd < bestD) { bestD = dd; best = p; }
+    }
+    const Vec2 a = target.points[0], b = target.points[1];
+    out = target;
+    if (distance(a, pick) < distance(b, pick))
+        out.points = {best, b};
+    else
+        out.points = {a, best};
+    return true;
+}
+
+// 把 target 线段延伸到与 boundary 相交处（取段外、最近的交点）
+inline bool extendLineTo(const Entity& target, const Entity& boundary, Entity& out)
+{
+    if (target.type != EntityType::Line || target.points.size() < 2)
+        return false;
+    const Vec2 a = target.points[0], b = target.points[1];
+    std::vector<Vec2> pts;
+    if (boundary.type == EntityType::Line && boundary.points.size() >= 2) {
+        Vec2 p;
+        if (lineIntersection(a, b, boundary.points[0], boundary.points[1], p))
+            pts.push_back(p);
+    } else if (boundary.type == EntityType::Circle || boundary.type == EntityType::Arc
+               || boundary.type == EntityType::Concentric) {
+        pts = lineCircleRaw(a, b, boundary.points[0], boundary.radius);
+        if (boundary.type == EntityType::Arc) {
+            std::vector<Vec2> f;
+            for (const Vec2& p : pts)
+                if (angleWithinArc(p, boundary.points[0], boundary.startAngle,
+                                   boundary.endAngle - boundary.startAngle))
+                    f.push_back(p);
+            pts = f;
+        }
+    }
+    Vec2 best;
+    bool found = false;
+    double bestScore = 1e12;
+    const Vec2 ab = b - a;
+    const double denom = dot(ab, ab);
+    for (const Vec2& p : pts) {
+        const double t = denom > kEps ? dot(p - a, ab) / denom : 0.0;
+        if (t >= -kEps && t <= 1.0 + kEps)
+            continue;                       // 段内不算延伸
+        const double score = std::min(distance(p, a), distance(p, b));
+        if (score < bestScore) { bestScore = score; best = p; found = true; }
+    }
+    if (!found)
+        return false;
+    out = target;
+    if (distance(best, a) < distance(best, b))
+        out.points = {best, b};
+    else
+        out.points = {a, best};
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// 阶段 5：特定功能几何辅助（切线 / 轮廓 / 测量）
+// ---------------------------------------------------------------------------
+
+// 折线段（用于轮廓串联与长度测量）
+struct Segment {
+    Vec2 a;
+    Vec2 b;
+};
+
+// 从 from 点向以 c 为圆心、r 为半径的圆作切线，返回两个切点（圆上）。
+// from 在圆上或圆内时无切线（返回空）。切线即过 from 与各切点的直线。
+inline std::vector<Vec2> tangentsFromPoint(const Vec2& from, const Vec2& c, double r)
+{
+    std::vector<Vec2> res;
+    const Vec2 d = c - from;
+    const double dist = length(d);
+    if (dist <= r + kEps || r <= 0.0)          // 原点在圆上/内或半径非法
+        return res;
+    const double L = std::sqrt(dist * dist - r * r);   // |from - 切点|
+    const Vec2 dir = d / dist;
+    const double a = std::asin(std::min(1.0, r / dist));   // 切线与 OC 的夹角
+    for (double s : {1.0, -1.0}) {
+        const double ang = s * a;
+        const double cs = std::cos(ang), sn = std::sin(ang);
+        const Vec2 u{dir.x * cs - dir.z * sn, dir.x * sn + dir.z * cs};
+        res.push_back(from + u * L);
+    }
+    return res;
+}
+
+// 圆弧的带符号角度跨度（度），非圆弧返回 0
+inline double arcSpanDeg(const Entity& e)
+{
+    if (e.type != EntityType::Arc)
+        return 0.0;
+    return std::abs(e.endAngle - e.startAngle);
+}
+
+// 把图元拆成若干直线段（线段 / 曲线按现有点；矩形 4 边；圆弧按跨度的均匀采样）
+// 圆 / 同心圆 / 点 / 文本 / 标注不返回开放链段
+inline std::vector<Segment> entitySegments(const Entity& e)
+{
+    std::vector<Segment> segs;
+    auto push = [&](const Vec2& a, const Vec2& b) {
+        if (distance(a, b) > kEps)
+            segs.push_back({a, b});
+    };
+    switch (e.type) {
+    case EntityType::Line:
+    case EntityType::Curve:
+        for (std::size_t i = 1; i < e.points.size(); ++i)
+            push(e.points[i - 1], e.points[i]);
+        break;
+    case EntityType::Rectangle:
+        if (e.points.size() >= 2) {
+            const Vec2 a = e.points[0], c = e.points[1];
+            const Vec2 b{c.x, a.z}, d{a.x, c.z};
+            push(a, b); push(b, c); push(c, d); push(d, a);
+        }
+        break;
+    case EntityType::Arc: {
+        if (e.points.empty() || e.radius <= 0.0)
+            break;
+        const Vec2 c = e.points.front();
+        const double span = e.endAngle - e.startAngle;
+        const int n = std::max(2, static_cast<int>(std::abs(span) / 6.0) + 1);
+        Vec2 prev = c + Vec2{e.radius * std::cos(degToRad(e.startAngle)),
+                             e.radius * std::sin(degToRad(e.startAngle))};
+        for (int i = 1; i <= n; ++i) {
+            const double ang = degToRad(e.startAngle + span * static_cast<double>(i) / n);
+            const Vec2 p = c + Vec2{e.radius * std::cos(ang), e.radius * std::sin(ang)};
+            push(prev, p);
+            prev = p;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    return segs;
+}
+
+// 把若干折线段按端点衔接串联成一条有序折线（eps 为衔接容差，单位 mm）。
+// 优先从「自由端点」（仅一处衔接）起步；无法衔接的段丢弃。
+inline std::vector<Vec2> chainContour(std::vector<Segment> segs, double eps = 1e-3)
+{
+    if (segs.empty())
+        return {};
+    const auto eq = [eps](const Vec2& p, const Vec2& q) { return distance(p, q) <= eps; };
+
+    // 统计每段端点的衔接次数，挑选一处衔接最少的段作为起点
+    std::vector<int> deg(segs.size(), 0);
+    for (std::size_t i = 0; i < segs.size(); ++i)
+        for (std::size_t j = 0; j < segs.size(); ++j)
+            if (i != j && (eq(segs[j].a, segs[i].a) || eq(segs[j].b, segs[i].a)
+                            || eq(segs[j].a, segs[i].b) || eq(segs[j].b, segs[i].b)))
+                deg[i]++;
+    int seed = 0;
+    for (std::size_t i = 0; i < segs.size(); ++i)
+        if (deg[i] <= 1) { seed = static_cast<int>(i); break; }
+
+    auto findNext = [&](const Vec2& end) -> int {
+        for (std::size_t i = 0; i < segs.size(); ++i) {
+            if (used[i])
+                continue;
+            if (eq(segs[i].a, end))
+                return static_cast<int>(i);
+            if (eq(segs[i].b, end)) {
+                std::swap(segs[i].a, segs[i].b);
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
+    };
+
+    std::vector<bool> used(segs.size(), false);
+    std::vector<Vec2> pts;
+    pts.push_back(segs[seed].a);
+    pts.push_back(segs[seed].b);
+    used[seed] = true;
+    while (true) {
+        const int nxt = findNext(pts.back());
+        if (nxt < 0)
+            break;
+        used[nxt] = true;
+        pts.push_back(segs[nxt].b);
+    }
+    return pts;
+}
+
 }  // namespace cad

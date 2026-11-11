@@ -1,0 +1,200 @@
+{
+    "current": {
+        "color": 0,
+        "lineType": 0,
+        "lineWidth": 0
+    },
+    "entities": [
+        {
+            "color": 1,
+            "endAngle": 0,
+            "id": 1,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -10,
+                    "z": -10
+                },
+                {
+                    "x": 10,
+                    "z": 10
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 3,
+            "endAngle": 0,
+            "id": 2,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 0,
+                    "z": 0
+                }
+            ],
+            "radius": 30,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "circle",
+            "visible": true
+        },
+        {
+            "color": 2,
+            "endAngle": 90,
+            "id": 3,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 40,
+                    "z": 0
+                }
+            ],
+            "radius": 20,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "arc",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 4,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 0,
+                    "z": 40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "阶段4",
+            "textHeight": 8,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 5,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -50,
+                    "z": 0
+                },
+                {
+                    "x": -30,
+                    "z": 20
+                },
+                {
+                    "x": -10,
+                    "z": 0
+                },
+                {
+                    "x": 10,
+                    "z": 20
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "curve",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 6,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -60,
+                    "z": -40
+                },
+                {
+                    "x": -20,
+                    "z": -10
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "rect",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 7,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 60,
+                    "z": 60
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 8,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 80,
+                    "z": 0
+                }
+            ],
+            "radius": 25,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 5,
+            "type": "concentric",
+            "visible": true
+        }
+    ],
+    "format": "Part2D",
+    "nextId": 9,
+    "version": 2
+}

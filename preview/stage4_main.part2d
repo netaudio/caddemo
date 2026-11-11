@@ -1,0 +1,1069 @@
+{
+    "current": {
+        "color": 1,
+        "lineType": 0,
+        "lineWidth": 0
+    },
+    "entities": [
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 1,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -170,
+                    "z": 110
+                },
+                {
+                    "x": -60,
+                    "z": 110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 2,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 0,
+                    "z": 40
+                }
+            ],
+            "radius": 46,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "circle",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 3,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -170,
+                    "z": -30
+                },
+                {
+                    "x": -70,
+                    "z": -110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "rect",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 4,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -180,
+                    "z": 10
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 5,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -165,
+                    "z": -145
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "CAD 绘图",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 6,
+            "innerRadius": 22,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 150,
+                    "z": 40
+                }
+            ],
+            "radius": 44,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "concentric",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 1.005086005254185,
+            "id": 7,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 78.92857142857143,
+                    "z": 133.92857142857142
+                }
+            ],
+            "radius": 61.08082634459669,
+            "startAngle": 164.74488129694225,
+            "text": "",
+            "textHeight": 14,
+            "type": "arc",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": -46.017036869641345,
+            "id": 8,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 80,
+                    "z": 6.807335387954474
+                }
+            ],
+            "radius": 72,
+            "startAngle": -133.9829631303587,
+            "text": "",
+            "textHeight": 14,
+            "type": "arc",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": -35.00000000000003,
+            "id": 9,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 85,
+                    "z": -104.98962308951451
+                }
+            ],
+            "radius": 61.0387294380728,
+            "startAngle": -145.00000000000003,
+            "text": "",
+            "textHeight": 14,
+            "type": "arc",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 10,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -180,
+                    "z": 190
+                },
+                {
+                    "x": -176.43,
+                    "z": 191.75750000000002
+                },
+                {
+                    "x": -171.84,
+                    "z": 194.35999999999999
+                },
+                {
+                    "x": -166.41,
+                    "z": 197.55249999999998
+                },
+                {
+                    "x": -160.32,
+                    "z": 201.08
+                },
+                {
+                    "x": -153.75,
+                    "z": 204.6875
+                },
+                {
+                    "x": -146.88,
+                    "z": 208.12
+                },
+                {
+                    "x": -139.89,
+                    "z": 211.1225
+                },
+                {
+                    "x": -132.96,
+                    "z": 213.44
+                },
+                {
+                    "x": -126.27000000000001,
+                    "z": 214.8175
+                },
+                {
+                    "x": -120,
+                    "z": 215
+                },
+                {
+                    "x": -114,
+                    "z": 213.66
+                },
+                {
+                    "x": -108,
+                    "z": 210.88
+                },
+                {
+                    "x": -102,
+                    "z": 207.02
+                },
+                {
+                    "x": -96,
+                    "z": 202.44
+                },
+                {
+                    "x": -90,
+                    "z": 197.5
+                },
+                {
+                    "x": -84,
+                    "z": 192.56
+                },
+                {
+                    "x": -78,
+                    "z": 187.98
+                },
+                {
+                    "x": -72,
+                    "z": 184.11999999999998
+                },
+                {
+                    "x": -66,
+                    "z": 181.34
+                },
+                {
+                    "x": -60,
+                    "z": 180
+                },
+                {
+                    "x": -53.730000000000004,
+                    "z": 180.1825
+                },
+                {
+                    "x": -47.04,
+                    "z": 181.56
+                },
+                {
+                    "x": -40.11,
+                    "z": 183.8775
+                },
+                {
+                    "x": -33.12,
+                    "z": 186.88
+                },
+                {
+                    "x": -26.25,
+                    "z": 190.3125
+                },
+                {
+                    "x": -19.68,
+                    "z": 193.92
+                },
+                {
+                    "x": -13.59,
+                    "z": 197.44750000000002
+                },
+                {
+                    "x": -8.16,
+                    "z": 200.64
+                },
+                {
+                    "x": -3.570000000000004,
+                    "z": 203.24249999999998
+                },
+                {
+                    "x": 0,
+                    "z": 205
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "curve",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 11,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -148,
+                    "z": 110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 12,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -126,
+                    "z": 110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 13,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -104,
+                    "z": 110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 14,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": -82,
+                    "z": 110
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 15,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 0,
+                    "z": 40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "point",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 16,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 190.4,
+                    "z": -17.2
+                },
+                {
+                    "x": 240,
+                    "z": 20
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 17,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 209.6,
+                    "z": -17.2
+                },
+                {
+                    "x": 160,
+                    "z": 20
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 18,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 190.4,
+                    "z": -17.2
+                },
+                {
+                    "x": 209.6,
+                    "z": -17.2
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 19,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 160,
+                    "z": -110
+                },
+                {
+                    "x": 240,
+                    "z": -60
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 20,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 240,
+                    "z": -110
+                },
+                {
+                    "x": 160,
+                    "z": -60
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 22,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 300,
+                    "z": 150
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "阶段3 · 编辑/工具命令验证",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 23,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 270,
+                    "z": 70
+                },
+                {
+                    "x": 330,
+                    "z": 70
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 24,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 270,
+                    "z": 90
+                },
+                {
+                    "x": 330,
+                    "z": 90
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 25,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 300,
+                    "z": 104
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "偏移",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 26,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 400,
+                    "z": 70
+                },
+                {
+                    "x": 430,
+                    "z": 70
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 27,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 400,
+                    "z": 95
+                },
+                {
+                    "x": 400,
+                    "z": 45
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 28,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 400,
+                    "z": 104
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "修剪",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 29,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 475,
+                    "z": 70
+                },
+                {
+                    "x": 525,
+                    "z": 70
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 30,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 500,
+                    "z": 70
+                },
+                {
+                    "x": 500,
+                    "z": 95
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 31,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 500,
+                    "z": 104
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "延伸",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 32,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 570,
+                    "z": 70
+                },
+                {
+                    "x": 630,
+                    "z": 70
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 33,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 600,
+                    "z": 104
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "箭头",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 34,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 270,
+                    "z": -40
+                },
+                {
+                    "x": 330,
+                    "z": -40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 35,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 300,
+                    "z": -62
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "平移",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 36,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 370,
+                    "z": -40
+                },
+                {
+                    "x": 430,
+                    "z": -40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 37,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 370,
+                    "z": -40
+                },
+                {
+                    "x": 310,
+                    "z": -40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 38,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 400,
+                    "z": -84
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "对称",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 39,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 470,
+                    "z": -40
+                },
+                {
+                    "x": 530,
+                    "z": -40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "60.00",
+            "textHeight": 8,
+            "type": "dimension",
+            "visible": true
+        },
+        {
+            "color": 0,
+            "endAngle": 0,
+            "id": 40,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 500,
+                    "z": -62
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "标注",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        },
+        {
+            "color": 1,
+            "endAngle": 0,
+            "id": 41,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 570,
+                    "z": -40
+                },
+                {
+                    "x": 630,
+                    "z": -40
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "",
+            "textHeight": 14,
+            "type": "line",
+            "visible": true
+        },
+        {
+            "color": 1,
+            "endAngle": 0,
+            "id": 42,
+            "innerRadius": 0,
+            "layer": "0",
+            "lineType": 0,
+            "lineWidth": 0,
+            "points": [
+                {
+                    "x": 600,
+                    "z": -62
+                }
+            ],
+            "radius": 0,
+            "startAngle": 0,
+            "text": "颜色",
+            "textHeight": 14,
+            "type": "text",
+            "visible": true
+        }
+    ],
+    "format": "Part2D",
+    "nextId": 43,
+    "version": 2
+}

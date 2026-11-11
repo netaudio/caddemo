@@ -2,6 +2,7 @@
 
 #include "CadDocument.h"
 #include "CadDrawController.h"
+#include "CadEditController.h"
 #include "CadEntityPainter.h"
 #include "CadGeometry.h"
 
@@ -57,6 +58,12 @@ void CadCanvas::setDocument(CadDocument* document)
 void CadCanvas::setDrawController(CadDrawController* controller)
 {
     m_drawController = controller;
+    update();
+}
+
+void CadCanvas::setEditController(CadEditController* controller)
+{
+    m_editController = controller;
     update();
 }
 
@@ -224,6 +231,8 @@ void CadCanvas::drawEntities(QPainter& painter)
 
     const QSizeF vp = viewport();
     for (const cad::Entity& entity : m_document->entities()) {
+        if (!entity.visible)
+            continue;
         QPen pen = cadpainter::entityPen(entity);
         if (m_document->isSelected(entity.id)) {
             pen.setColor(QColor("#2b6cd9"));
@@ -257,6 +266,8 @@ void CadCanvas::paintEvent(QPaintEvent*)
     drawRubberBand(painter);
     if (m_drawController)
         m_drawController->drawPreview(painter, m_view, viewport());
+    if (m_editController)
+        m_editController->drawPreview(painter, m_view, viewport());
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +284,8 @@ qint64 CadCanvas::hitTest(const QPointF& screenPos) const
     double best = tolerance;
     qint64 bestId = 0;
     for (const cad::Entity& entity : m_document->entities()) {
+        if (!entity.visible)
+            continue;
         const double d = cad::distanceToEntity(world, entity);
         if (d < best) {
             best = d;
@@ -296,6 +309,21 @@ void CadCanvas::mousePressEvent(QMouseEvent* event)
         if (event->button() == Qt::LeftButton) {
             const cad::Vec2 world = m_view.toWorld(pos, viewport());
             m_drawController->onPoint(world, hitTest(pos));
+            event->accept();
+            return;
+        }
+    }
+
+    // 编辑 / 工具命令进行中：左键收集点位 / 拾取对象，右键结束命令
+    if (m_editController && m_editController->isActive()) {
+        if (event->button() == Qt::RightButton) {
+            m_editController->onRightClick();
+            event->accept();
+            return;
+        }
+        if (event->button() == Qt::LeftButton) {
+            const cad::Vec2 world = m_view.toWorld(pos, viewport());
+            m_editController->onPoint(world, hitTest(pos));
             event->accept();
             return;
         }
@@ -348,6 +376,8 @@ void CadCanvas::mouseMoveEvent(QMouseEvent* event)
     emit cursorMoved(world.x, world.z);
     if (m_drawController && m_drawController->isActive())
         m_drawController->onHover(world);
+    else if (m_editController && m_editController->isActive())
+        m_editController->onHover(world);
 
     if (m_panning) {
         m_view.panByPixels(pos - m_lastMouse);
@@ -395,6 +425,17 @@ void CadCanvas::keyPressEvent(QKeyEvent* event)
         }
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
             m_drawController->finishCurrent();
+            event->accept();
+            return;
+        }
+    } else if (m_editController && m_editController->isActive()) {
+        if (event->key() == Qt::Key_Escape) {
+            m_editController->cancel();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+            m_editController->finishCurrent();
             event->accept();
             return;
         }
