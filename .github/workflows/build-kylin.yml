@@ -239,9 +239,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --repo 显式指定：本 job 无 checkout，工作目录不是 git 仓库，
+          # gh 无法自行推断仓库上下文
           gh release create "$GITHUB_REF_NAME" \
             caddemo-kylin-v10sp1-x86_64.tar.gz \
             caddemo-kylin-v10sp1-arm64.tar.gz \
+            --repo "${{ github.repository }}" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
 
