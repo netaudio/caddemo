@@ -173,6 +173,10 @@ jobs:
               tail -n 80 build/arm64-build.log || true
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+            # 再打成一条 error 注解：annotations 接口可匿名读取，便于无 token 诊断
+            msg=$(tail -n 60 build/arm64-build.log | tr -d '\r' \
+                  | sed ':a;N;$!ba;s/\n/%0A/g' | cut -c1-12000)
+            echo "::error title=arm64-build::$msg"
             exit "$rc"
           fi
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
