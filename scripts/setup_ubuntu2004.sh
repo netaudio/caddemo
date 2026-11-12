@@ -21,7 +21,10 @@ if ! apt-get update; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y --no-install-recommends \
+# --allow-downgrades：Debian bullseye 已 EOL，其镜像内预装的包（如 libc6 u14）
+# 可能高于当前可用源中的版本；与 libc6-dev/perl 这类严格等版本依赖并存时，
+# apt 会判定依赖冲突。允许降级即可把版本统一到源里，Ubuntu 上不会触发降级。
+apt-get install -y --no-install-recommends --allow-downgrades \
     build-essential gcc g++ make cmake ninja-build \
     python3 python3-dev python3-pip \
     p7zip-full file patchelf ca-certificates \

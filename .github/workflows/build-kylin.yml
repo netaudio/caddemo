@@ -140,12 +140,17 @@ jobs:
             debian:bullseye \
             bash -c "
               set -euo pipefail
-              # bullseye 已进入 EOL，security/updates 源可能已归档，
-              # 移除它们只保留主源，避免 apt-get update 因单个源失效而整体失败。
-              sed -i -e '/bullseye-security/d' -e '/bullseye-updates/d' /etc/apt/sources.list
+              # bullseye 已 EOL：security 源已从 security.debian.org 归档，
+              # 改指向 archive.debian.org（主源与 bullseye-updates 仍可访问）。
+              # 同时兼容传统 sources.list 与 deb822 的 .sources 两种格式。
+              for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do
+                [ ! -f \"\$f\" ] || sed -i 's|security.debian.org|archive.debian.org|g' \"\$f\"
+              done
+              echo 'Acquire::Check-Valid-Until \"false\";' > /etc/apt/apt.conf.d/99archive
               bash scripts/setup_ubuntu2004.sh
               apt-get update
-              apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools
+              apt-get install -y --no-install-recommends --allow-downgrades \
+                qtbase5-dev qtbase5-dev-tools
               rm -rf /var/lib/apt/lists/*
               # bullseye 已移除 qt5-default，用 qtchooser 显式选中 Qt5
               export QT_SELECT=qt5
