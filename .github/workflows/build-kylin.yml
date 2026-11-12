@@ -21,6 +21,11 @@ on:
     tags: [ 'v*' ]   # 打版本 tag 时触发 release job
   pull_request:
   workflow_dispatch:
+    inputs:
+      build_x64:
+        description: '同时构建 x86_64 版本（默认只编 arm64）'
+        type: boolean
+        default: false
 
 env:
   QT_MAJOR: "5"
@@ -36,6 +41,13 @@ jobs:
   kylin-x86_64:
     name: 麒麟 V10 SP1 · x86_64（托管）
     runs-on: ubuntu-22.04
+    # ── x86_64 开关 ───────────────────────────────────────────────────────
+    # 平时默认只编 arm64。需要 x86_64 时两种方式：
+    #   1. 单次：手动触发（workflow_dispatch）勾选 build_x64；
+    #   2. 持久：仓库 Settings → Secrets and variables → Actions →
+    #      Variables 新建 BUILD_X64 = true（对 push / tag 均生效），
+    #      不需要时删除该变量即可。
+    if: inputs.build_x64 == true || vars.BUILD_X64 == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -215,7 +227,13 @@ jobs:
   # =========================================================================
   release:
     name: 发布 GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
+    # x86_64 关闭时该 job 为 skipped；needs 里出现 skipped 默认会连带
+    # 跳过本 job，所以用 always() 显式判定：arm64 必须成功，x64 不失败即可。
+    if: >-
+      always() && !cancelled() &&
+      startsWith(github.ref, 'refs/tags/') &&
+      needs.kylin-arm64.result == 'success' &&
+      needs.kylin-x86_64.result != 'failure'
     needs: [kylin-x86_64, kylin-arm64]
     runs-on: ubuntu-22.04
     permissions:
@@ -229,11 +247,15 @@ jobs:
 
       - name: 恢复执行位并打包 tar.gz
         run: |
+          assets=""
           for d in caddemo-kylin-v10sp1-x86_64 caddemo-kylin-v10sp1-arm64; do
+            [ -d "$d" ] || { echo "==> 跳过 ${d}（本次未构建）"; continue; }
             chmod +x "$d/bin/caddemo" "$d/bin/run-caddemo.sh"
             tar -czf "${d}.tar.gz" -C "$d" .
             echo "==> ${d}.tar.gz（$(du -h ${d}.tar.gz | cut -f1)）"
+            assets="$assets ${d}.tar.gz"
           done
+          echo "ASSETS=$assets" >> "$GITHUB_ENV"
 
       - name: 创建 Release 并上传附件
         env:
@@ -241,9 +263,9 @@ jobs:
         run: |
           # --repo 显式指定：本 job 无 checkout，工作目录不是 git 仓库，
           # gh 无法自行推断仓库上下文
+          # shellcheck disable=SC2086
           gh release create "$GITHUB_REF_NAME" \
-            caddemo-kylin-v10sp1-x86_64.tar.gz \
-            caddemo-kylin-v10sp1-arm64.tar.gz \
+            $ASSETS \
             --repo "${{ github.repository }}" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
