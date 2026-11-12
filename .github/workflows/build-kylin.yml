@@ -18,6 +18,7 @@ name: Build Linux (Kylin V10 桌面版)
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]   # 打版本 tag 时触发 release job
   pull_request:
   workflow_dispatch:
 
@@ -82,11 +83,14 @@ jobs:
       #     QT_QPA_PLATFORM=offscreen ./caddemo --selftest
       #     echo "✅ selftest 正常退出"
 
+      # 上传解压后的目录：artifact 下载必然被 GitHub 套一层 zip，
+      # 放目录进去，下载方解压一次即可运行，无需再 tar -xzf。
+      # 原版 tar.gz 由 Release job 提供（打 tag 时，见下方 release job）。
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: caddemo-kylin-v10sp1-x86_64
-          path: dist/linux-kylin-x64.tar.gz
+          path: dist/linux-kylin-x64
           retention-days: 14
 
       - name: 保留构建日志
@@ -185,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: caddemo-kylin-v10sp1-arm64
-          path: dist/linux-kylin-arm64.tar.gz
+          path: dist/linux-kylin-arm64
           retention-days: 14
 
       - name: 保留构建日志
@@ -197,6 +201,49 @@ jobs:
             build/linux-kylin-arm64/CMakeCache.txt
           if-no-files-found: ignore
           retention-days: 7
+
+  # =========================================================================
+  # 发版：打 tag（如 v0.1.0）时，把双平台 tar.gz 原样挂到 GitHub Release。
+  #
+  # ── 为什么需要这个 job ─────────────────────────────────────────────────
+  #   artifact 下载必然被 GitHub 套一层 zip；Release 附件才是原始文件，
+  #   从 Release 页面下载的 tar.gz 与构建产物逐字节一致。
+  #
+  # ── 为什么重新 chmod +x ────────────────────────────────────────────────
+  #   artifact 的 zip 不保留 Unix 执行位，下载后必须恢复 caddemo 与
+  #   run-caddemo.sh 的执行权限，否则 tar.gz 里的文件不可执行。
+  # =========================================================================
+  release:
+    name: 发布 GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [kylin-x86_64, kylin-arm64]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: 下载双平台产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: caddemo-kylin-v10sp1-*
+          merge-multiple: false
+
+      - name: 恢复执行位并打包 tar.gz
+        run: |
+          for d in caddemo-kylin-v10sp1-x86_64 caddemo-kylin-v10sp1-arm64; do
+            chmod +x "$d/bin/caddemo" "$d/bin/run-caddemo.sh"
+            tar -czf "${d}.tar.gz" -C "$d" .
+            echo "==> ${d}.tar.gz（$(du -h ${d}.tar.gz | cut -f1)）"
+          done
+
+      - name: 创建 Release 并上传附件
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            caddemo-kylin-v10sp1-x86_64.tar.gz \
+            caddemo-kylin-v10sp1-arm64.tar.gz \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
 
   # =========================================================================
   # 发版前最终验证：跑在真实的麒麟机器上（self-hosted runner）。
