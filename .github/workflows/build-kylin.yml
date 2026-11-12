@@ -102,12 +102,16 @@ jobs:
   # =========================================================================
   # ARM64 构建：GitHub 托管 runner 只有 x86_64，用 QEMU 跑 arm64 容器。
   #
-  # ── 为什么 ARM64 用系统源 Qt5（5.12.8）而不是下载 5.15.2 ──────────────
-  #   Qt 官方不为 linux/arm64 桌面提供预编译包（aqt 仅 x86_64），
-  #   因此容器内直接 apt 安装 qtbase5-dev，构建脚本自动探测系统 qmake。
-  #   Qt 运行库会随包携带（libQt5Core.so.5 等已拷入 bin/），
-  #   目标机上无需安装同版本 Qt，版本差（5.12.8 vs 5.15.2）不影响运行。
-  #   代码兼容全部 Qt5（见 CadInputParser.cpp 的 kSkipEmptyParts）。
+  # ── 为什么 arm64 用 debian:bullseye 而不是 ubuntu:20.04 ────────────────
+  #   focal 源里的 Qt5 是 5.12.8，缺少 Qt 5.15 才引入的 API（如
+  #   QButtonGroup::idClicked），与麒麟系统自带的 Qt 5.15.2 也不一致。
+  #   Debian 11 (bullseye) 恰好同为 glibc 2.31，且 qtbase5-dev = 5.15.2
+  #   （与麒麟 V10 SP1 系统源同版本），因此用它构建最贴近目标机。
+  #   注意不能用 bookworm：它是 glibc 2.36，产物到麒麟上起不来。
+  #
+  # ── 为什么 ARM64 用系统源 Qt5 而不是下载官方包 ──────────────────────────
+  #   Qt 官方不为 linux/arm64 桌面提供 5.15.2 预编译包（aqt 仅 gcc_64）。
+  #   系统包已满足版本要求，且运行库会随产物打入 bin/。
   #
   # ── 兼容性交验为什么在容器内做 ─────────────────────────────────────────
   #   x86_64 主机的 objdump 读不了 arm64 ELF（binutils 只配了本机 target），
@@ -124,7 +128,7 @@ jobs:
         with:
           platforms: arm64
 
-      - name: 容器内构建 + 校验（Ubuntu 20.04 arm64 / glibc 2.31）
+      - name: 容器内构建 + 校验（Debian bullseye arm64 / glibc 2.31 / Qt 5.15.2）
         run: |
           docker run --rm --platform linux/arm64 \
             -v "$PWD":/src \
@@ -133,13 +137,19 @@ jobs:
             -e QT_VERSION="${QT_VERSION}" \
             -e PREFIX=/src/dist/linux-kylin-arm64 \
             -e BUILD_DIR=/src/build/linux-kylin-arm64 \
-            ubuntu:20.04 \
+            debian:bullseye \
             bash -c "
               set -euo pipefail
+              # bullseye 已进入 EOL，security/updates 源可能已归档，
+              # 移除它们只保留主源，避免 apt-get update 因单个源失效而整体失败。
+              sed -i -e '/bullseye-security/d' -e '/bullseye-updates/d' /etc/apt/sources.list
               bash scripts/setup_ubuntu2004.sh
               apt-get update
               apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools
               rm -rf /var/lib/apt/lists/*
+              # bullseye 已移除 qt5-default，用 qtchooser 显式选中 Qt5
+              export QT_SELECT=qt5
+              echo '==> 系统 Qt5 版本：'\$(qmake -query QT_VERSION)
               bash scripts/build_linux.sh
 
               BIN=/src/dist/linux-kylin-arm64/bin
