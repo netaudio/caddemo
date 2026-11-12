@@ -100,8 +100,15 @@ RibbonBar::RibbonBar(QWidget* parent)
     }
     m_tabLayout->addStretch(1);
 
+    // Qt 5 / Qt 6 双版本兼容：idClicked(int) 是 Qt 5.15 才新增的信号，
+    // 更早的 Qt5（如 Ubuntu 20.04 自带 5.12.8）只有 buttonClicked(int) 重载。
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(m_tabGroup, &QButtonGroup::idClicked,
             m_pages, &QStackedWidget::setCurrentIndex);
+#else
+    connect(m_tabGroup, QOverload<int>::of(&QButtonGroup::buttonClicked),
+            m_pages, &QStackedWidget::setCurrentIndex);
+#endif
 
     mainLayout->addWidget(tabRow);
     mainLayout->addWidget(m_pages);
