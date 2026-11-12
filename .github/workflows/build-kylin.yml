@@ -17,8 +17,8 @@ name: Build Linux (Kylin V10 桌面版)
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]   # 打版本 tag 时触发 release job
+    # branches: [ main, master ]   # 平时 push 不自动编译；需要时取消注释即可
+    tags: [ 'v*' ]   # 打版本 tag 时触发编译 + 发 Release
   pull_request:
   workflow_dispatch:
     inputs:
