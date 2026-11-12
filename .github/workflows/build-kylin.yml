@@ -127,6 +127,8 @@ jobs:
 
       - name: 容器内构建 + 校验（Ubuntu 20.04 arm64 / glibc 2.31 / Qt 5.12.8）
         run: |
+          mkdir -p build
+          set +e
           docker run --rm --platform linux/arm64 \
             -v "$PWD":/src \
             -w /src \
@@ -161,7 +163,18 @@ jobs:
               check_max \"\$BIN/libQt5Core.so.5\" 'GLIBC_[0-9.]*'   '${KYLIN_MAX_GLIBC}'   'Qt5Core GLIBC'
               check_max \"\$BIN/libQt5Core.so.5\" 'GLIBCXX_[0-9.]*' '${KYLIN_MAX_GLIBCXX}' 'Qt5Core GLIBCXX'
               echo '✅ arm64 产物兼容麒麟桌面版 V10 SP1'
-            "
+            " 2>&1 | tee build/arm64-build.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            {
+              echo '## arm64 构建失败'
+              echo '```'
+              tail -n 80 build/arm64-build.log || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$rc"
+          fi
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
 
       - name: 上传产物
