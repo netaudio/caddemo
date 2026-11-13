@@ -174,8 +174,9 @@ QComboBox* RibbonBar::makeCombo(const QString& property, const QStringList& item
     combo->setObjectName(QStringLiteral("propertyCombo"));
     combo->addItems(items);
     combo->setFixedHeight(21);
-    // 68px 足够容纳「双点划线」+ 下拉箭头；此前 100px 使「当前属性」组超出窗口宽度
-    combo->setFixedWidth(68);
+    // 最小 68px（容纳「双点划线」+ 下拉箭头），「当前属性」组拉伸时随之变宽
+    combo->setMinimumWidth(68);
+    combo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     combo->setFocusPolicy(Qt::NoFocus);
     connect(combo, &QComboBox::currentTextChanged, this,
             [this, property](const QString& value) { emit propertyChanged(property, value); });
@@ -185,9 +186,14 @@ QComboBox* RibbonBar::makeCombo(const QString& property, const QStringList& item
 QWidget* RibbonBar::makePropertyBlock()
 {
     auto* group = new RibbonGroup(QStringLiteral("当前属性"), this);
+    // 组随窗口宽度自适应拉伸/收缩，吃掉功能区行尾的空白
+    group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     QGridLayout* grid = group->grid();
     grid->setHorizontalSpacing(4);
     grid->setVerticalSpacing(2);
+    // 让下拉框/输入框所在列按比例拉伸（值列比标签列宽一倍）
+    grid->setColumnStretch(1, 1);
+    grid->setColumnStretch(3, 2);
 
     auto label = [this](const QString& text) {
         auto* l = new QLabel(text, this);
@@ -212,7 +218,8 @@ QWidget* RibbonBar::makePropertyBlock()
     auto* delta = new QLineEdit(QStringLiteral("1.000000"), this);
     delta->setObjectName(QStringLiteral("propertyEdit"));
     delta->setFixedHeight(21);
-    delta->setFixedWidth(72);
+    delta->setMinimumWidth(72);
+    delta->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     delta->setAlignment(Qt::AlignRight);
     connect(delta, &QLineEdit::editingFinished, this,
             [this, delta]() { emit propertyChanged(QStringLiteral("deltaΔ"), delta->text()); });
@@ -324,11 +331,15 @@ QWidget* RibbonBar::buildCadPage()
     contentLayout->addWidget(specialGroup);
 
     // ---- 当前属性 ----
+    // 组本身为 Expanding，自动填满行尾剩余宽度（窄窗口时缩至最小宽度，
+    // 再窄则由 QScrollArea 提供横向滚动条）
     contentLayout->addWidget(makePropertyBlock());
-    contentLayout->addStretch(1);
-    // 固定内容最小宽度：窗口较窄时由 QScrollArea 提供横向滚动条，
-    // 避免「当前属性」等分组被压缩截断
-    page->setMinimumWidth(contentLayout->sizeHint().width());
+    // 自适应宽度：视口够宽时页面随视口拉伸（「当前属性」组吃掉剩余空间）；
+    // 视口不够宽时页面缩到内容最小宽度（Expanding 的属性组先收缩），
+    // 再窄才由 QScrollArea 提供横向滚动条。
+    // 注意这里必须用 minimumSize 而不是 sizeHint —— sizeHint 会把
+    // Expanding 控件的期望宽度算进去，强制页面比视口宽，右侧被裁。
+    page->setMinimumWidth(contentLayout->minimumSize().width());
 
     // 窄屏时功能区可横向滚动，保证按钮文字不被压缩
     auto* scroll = new QScrollArea(this);
