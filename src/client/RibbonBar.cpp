@@ -28,7 +28,7 @@ RibbonGroup::RibbonGroup(const QString& title, QWidget* parent)
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 3, 4, 0);
+    layout->setContentsMargins(3, 3, 3, 0);
     layout->setSpacing(0);
 
     auto* content = new QWidget(this);
@@ -174,7 +174,8 @@ QComboBox* RibbonBar::makeCombo(const QString& property, const QStringList& item
     combo->setObjectName(QStringLiteral("propertyCombo"));
     combo->addItems(items);
     combo->setFixedHeight(21);
-    combo->setFixedWidth(100);
+    // 68px 足够容纳「双点划线」+ 下拉箭头；此前 100px 使「当前属性」组超出窗口宽度
+    combo->setFixedWidth(68);
     combo->setFocusPolicy(Qt::NoFocus);
     connect(combo, &QComboBox::currentTextChanged, this,
             [this, property](const QString& value) { emit propertyChanged(property, value); });
@@ -211,7 +212,8 @@ QWidget* RibbonBar::makePropertyBlock()
     auto* delta = new QLineEdit(QStringLiteral("1.000000"), this);
     delta->setObjectName(QStringLiteral("propertyEdit"));
     delta->setFixedHeight(21);
-    delta->setFixedWidth(100);
+    delta->setFixedWidth(72);
+    delta->setAlignment(Qt::AlignRight);
     connect(delta, &QLineEdit::editingFinished, this,
             [this, delta]() { emit propertyChanged(QStringLiteral("deltaΔ"), delta->text()); });
     grid->addWidget(delta, 1, 3);
@@ -246,7 +248,7 @@ QWidget* RibbonBar::buildCadPage()
     page->setAttribute(Qt::WA_StyledBackground, true);
 
     auto* contentLayout = new QHBoxLayout(page);
-    contentLayout->setContentsMargins(4, 3, 4, 3);
+    contentLayout->setContentsMargins(2, 3, 2, 3);
     contentLayout->setSpacing(2);
 
     // ---- 文档 ----
