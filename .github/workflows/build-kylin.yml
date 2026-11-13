@@ -73,7 +73,7 @@ jobs:
             -e PAGE_ALIGN_64K=1 \
             ubuntu:18.04 \
             bash -c "bash scripts/setup_ubuntu1804.sh \
-              && apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools \
+              && apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools qt5-default \
               && rm -rf /var/lib/apt/lists/* \
               && bash scripts/build_linux.sh"
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
@@ -186,7 +186,9 @@ jobs:
               set -euo pipefail
               bash scripts/setup_ubuntu1804.sh
               apt-get update
-              apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools
+              # qt5-default：bionic 的 qmake 是 qtchooser shim，必须显式
+              # 设置默认 Qt 版本，否则 qmake -query 找不到 Qt 安装
+              apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools qt5-default
               rm -rf /var/lib/apt/lists/*
               echo '==> 系统 Qt5 版本：'\$(qmake -query QT_VERSION)
               bash scripts/build_linux.sh
