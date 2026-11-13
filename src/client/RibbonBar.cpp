@@ -252,9 +252,9 @@ QWidget* RibbonBar::buildCadPage()
     // ---- 文档 ----
     auto* docGroup = new RibbonGroup(QStringLiteral("文档"), page);
     addButton(docGroup->grid(), 0, 0, QStringLiteral("打开dxf"), QStringLiteral("dxf"));
-    addButton(docGroup->grid(), 0, 1, QStringLiteral("另存Part"));
-    addButton(docGroup->grid(), 1, 0, QStringLiteral("保存Part"));
-    addButton(docGroup->grid(), 2, 0, QStringLiteral("打开Part"));
+    addButton(docGroup->grid(), 0, 1, QStringLiteral("另存Part"), QStringLiteral("saveas"));
+    addButton(docGroup->grid(), 1, 0, QStringLiteral("保存Part"), QStringLiteral("save"));
+    addButton(docGroup->grid(), 2, 0, QStringLiteral("打开Part"), QStringLiteral("folder"));
     contentLayout->addWidget(docGroup);
 
     // ---- 绘图 ----
@@ -263,18 +263,18 @@ QWidget* RibbonBar::buildCadPage()
     addButton(drawGroup->grid(), 0, 1, QStringLiteral("圆弧(三点)"), QStringLiteral("arc"));
     addButton(drawGroup->grid(), 0, 2, QStringLiteral("曲线"), QStringLiteral("curve"));
     addButton(drawGroup->grid(), 0, 3, QStringLiteral("文本"), QStringLiteral("text"));
-    addButton(drawGroup->grid(), 0, 4, QStringLiteral("等分点"));
+    addButton(drawGroup->grid(), 0, 4, QStringLiteral("等分点"), QStringLiteral("divide"));
 
     addButton(drawGroup->grid(), 1, 0, QStringLiteral("直线"), QStringLiteral("line"));
     addButton(drawGroup->grid(), 1, 1, QStringLiteral("圆弧(端点+半径)"), QStringLiteral("arc"));
     addButton(drawGroup->grid(), 1, 2, QStringLiteral("矩形"), QStringLiteral("rect"));
-    addButton(drawGroup->grid(), 1, 3, QStringLiteral("圆角"));
-    addButton(drawGroup->grid(), 1, 4, QStringLiteral("圆心点"));
+    addButton(drawGroup->grid(), 1, 3, QStringLiteral("圆角"), QStringLiteral("fillet"));
+    addButton(drawGroup->grid(), 1, 4, QStringLiteral("圆心点"), QStringLiteral("centerpoint"));
 
     addButton(drawGroup->grid(), 2, 0, QStringLiteral("圆"), QStringLiteral("circle"));
     addButton(drawGroup->grid(), 2, 1, QStringLiteral("圆弧(端点+角度)"), QStringLiteral("arc"));
     addButton(drawGroup->grid(), 2, 2, QStringLiteral("同心圆"), QStringLiteral("concentric"));
-    addButton(drawGroup->grid(), 2, 3, QStringLiteral("倒角"));
+    addButton(drawGroup->grid(), 2, 3, QStringLiteral("倒角"), QStringLiteral("chamfer"));
     contentLayout->addWidget(drawGroup);
 
     // ---- 编辑 ----

@@ -224,6 +224,69 @@ void render(const QString& key, QPainter& p)
             p.drawLine(i, 2, i, 18);
             p.drawLine(2, i, 18, i);
         }
+    } else if (key == QLatin1String("folder")) {
+        // 打开Part：黄色文件夹，与橡皮/探针的黄色系一致
+        p.setPen(QPen(QColor("#8a6b1f"), 1.1));
+        p.setBrush(kYellow);
+        p.drawPolygon(QPolygonF() << QPointF(2, 6) << QPointF(7, 6) << QPointF(9, 8)
+                                  << QPointF(18, 8) << QPointF(18, 16) << QPointF(2, 16));
+        p.setPen(QPen(QColor("#a8842f"), 1));
+        p.drawLine(2, 10, 17, 10);
+    } else if (key == QLatin1String("saveas")) {
+        // 另存Part：软盘 + 黄色铅笔
+        p.setPen(QPen(kBlue, 1.2));
+        p.setBrush(QColor("#9dbdf0"));
+        p.drawRect(QRectF(2, 2, 13, 13));
+        p.setBrush(QColor("#eaf2ff"));
+        p.drawRect(QRectF(5, 3, 7, 4));
+        p.drawRect(QRectF(5, 9, 7, 4));
+        p.setPen(QPen(QColor("#8a6b1f"), 1));
+        p.setBrush(kYellow);
+        p.drawPolygon(QPolygonF() << QPointF(12, 17) << QPointF(17, 12)
+                                  << QPointF(18.5, 13.5) << QPointF(13.5, 18.5));
+        p.setBrush(kDark);
+        p.setPen(Qt::NoPen);
+        p.drawPolygon(QPolygonF() << QPointF(12, 17) << QPointF(13.5, 18.5)
+                                  << QPointF(10.5, 19.5));
+    } else if (key == QLatin1String("divide")) {
+        // 等分点：直线段 + 等分点（端点圆圈、中间实心点）
+        p.setPen(QPen(kRed, 1.4, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(2, 10, 18, 10);
+        p.setBrush(kRed);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QRectF(1, 8.5, 3, 3));
+        p.drawEllipse(QRectF(16, 8.5, 3, 3));
+        for (double x : {6.67, 10.0, 13.33})
+            p.drawEllipse(QPointF(x, 10), 1.2, 1.2);
+    } else if (key == QLatin1String("centerpoint")) {
+        // 圆心点：圆 + 十字中心线 + 圆心实心点
+        p.setPen(QPen(kRed, 1.2));
+        p.drawEllipse(QRectF(3.5, 3.5, 13, 13));
+        p.setPen(QPen(kRed, 1, Qt::DashLine));
+        p.drawLine(10, 4.5, 10, 15.5);
+        p.drawLine(4.5, 10, 15.5, 10);
+        p.setBrush(kRed);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(10, 10), 1.6, 1.6);
+    } else if (key == QLatin1String("fillet")) {
+        // 圆角：直角拐线以圆弧过渡
+        p.setPen(QPen(kRed, 1.4, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(5, 3, 5, 13);
+        p.drawArc(QRectF(5, 9, 8, 8), 180 * 16, 90 * 16);
+        p.drawLine(9, 17, 17, 17);
+        p.setBrush(kRed);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(5, 3), 1.4, 1.4);
+        p.drawEllipse(QPointF(17, 17), 1.4, 1.4);
+    } else if (key == QLatin1String("chamfer")) {
+        // 倒角：直角拐线以斜切边过渡
+        p.setPen(QPen(kRed, 1.4, Qt::SolidLine, Qt::RoundCap));
+        p.drawPolyline(QPolygonF() << QPointF(5, 3) << QPointF(5, 11)
+                                   << QPointF(11, 17) << QPointF(17, 17));
+        p.setBrush(kRed);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(5, 3), 1.4, 1.4);
+        p.drawEllipse(QPointF(17, 17), 1.4, 1.4);
     }
 }
 
