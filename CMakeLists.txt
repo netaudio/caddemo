@@ -51,8 +51,9 @@ endif()
 if(QT_MAJOR EQUAL 6)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets)
 else()
-    # 5.12 是下限：Ubuntu 20.04 仓库即为此版本，麒麟源自带 5.15.2
-    find_package(Qt5 5.12 REQUIRED COMPONENTS Core Gui Widgets)
+    # 5.9 是下限：ubuntu:18.04 构建容器的版本（构建 Qt 低于目标机 Qt 是安全的，
+    # Qt minor 版本向后兼容——5.9 编译产物可在麒麟 5.12/5.15 运行时上运行）
+    find_package(Qt5 5.9 REQUIRED COMPONENTS Core Gui Widgets)
 endif()
 
 # ---------------------------------------------------------------------------
