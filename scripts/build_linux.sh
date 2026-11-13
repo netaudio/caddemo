@@ -20,12 +20,22 @@
 #   BUILD_DIR      默认 build/linux-<arch>
 #   PREFIX         默认 dist/linux-<arch>
 #   SHIP_LIBSTDCXX 1 = 强制随包携带 libstdc++.so.6
+#   SHIP_QT        1（默认）= 随包携带 Qt 运行库/插件，目标机零依赖；
+#                  0 = 不携带，运行时用目标机系统 Qt。
+#                  麒麟 V10 SP1 arm64 内核是 64K 内存页（getconf PAGE_SIZE=65536），
+#                  发行版 Qt 库（4K 对齐）在其上无法加载，必须用目标机系统 Qt。
+#   PAGE_ALIGN_64K 1 = 可执行文件按 64K 页对齐链接（-z max-page-size=65536）。
+#                  64K 对齐产物可同时跑在 64K 页（麒麟 arm64 真机/QEMU 虚拟机）
+#                  与 4K 页（x86_64、部分 arm64 系统）环境 —— 一包两用。
 #
 # 兼容性硬约束（决定产物能否在麒麟上跑起来）：
-#   · glibc  —— 构建机必须 ≤ 目标机。麒麟服务器版 V10 是 2.28，桌面版 V10 SP1
-#               基于 Ubuntu 20.04（2.31）。构建环境选错会报 "GLIBC_2.34 not found"。
-#   · libstdc++ —— 麒麟服务器版自带 GCC 7.3，只到 GLIBCXX_3.4.24；若构建机
-#               GCC 更新，需 SHIP_LIBSTDCXX=1 把 libstdc++.so.6 打进包。
+#   · glibc  —— 构建机必须 ≤ 目标机。麒麟 V10 SP1 多架构统一 glibc 2.28
+#               （2026-11 arm64 真机实测修正：并非 20.04 的 2.31）。构建环境
+#               选错会报 "GLIBC_2.29 not found"。
+#   · libstdc++ —— 麒麟 V10 SP1 自带 GCC 7.3，GLIBCXX 上限 3.4.24；构建机
+#               GCC 更新时需 SHIP_LIBSTDCXX=1，或换 GCC7 构建。
+#   · 内存页 —— arm64 目标机 64K 页时构建必须 PAGE_ALIGN_64K=1，且不能
+#               随包携带 4K 对齐的发行版 Qt 库（SHIP_QT=0）。
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -44,6 +54,8 @@ BUILD_DIR="${BUILD_DIR:-${SRC_DIR}/build/linux-${QT_ARCH}}"
 PREFIX="${PREFIX:-${SRC_DIR}/dist/linux-${QT_ARCH}}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 SHIP_LIBSTDCXX="${SHIP_LIBSTDCXX:-0}"
+SHIP_QT="${SHIP_QT:-1}"
+PAGE_ALIGN_64K="${PAGE_ALIGN_64K:-0}"
 
 echo "==> 源码目录 : ${SRC_DIR}"
 echo "==> 构建目录 : ${BUILD_DIR}"
@@ -64,14 +76,24 @@ for d in /opt/rh/gcc-toolset-11/root/usr /opt/rh/gcc-toolset-*/root/usr; do
 done
 
 pick_python() {
+    # 放宽到 3.6：ubuntu:18.04(bionic) 的系统 python3 就是 3.6，
+    # 这里主要用于 pip 升级 cmake。需要 3.7+ 的 aqtinstall 调用前
+    # 用 ensure_py37 单独检查。
     for c in python3.11 python3.10 python3.9 python3.8 python3; do
         command -v "${c}" >/dev/null 2>&1 || continue
-        if "${c}" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 7) else 1)' 2>/dev/null; then
+        if "${c}" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 6) else 1)' 2>/dev/null; then
             echo "${c}"
             return 0
         fi
     done
     return 1
+}
+
+# aqtinstall 官方要求 Python >= 3.7（bionic 的 3.6 装不上）
+ensure_py37() {
+    local py="$1"
+    [ -n "${py}" ] || return 1
+    "${py}" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 7) else 1)' 2>/dev/null
 }
 
 cmake_new_enough() {
@@ -100,7 +122,7 @@ if [ "${QT_MAJOR}" = "6" ]; then
         QT_ROOT="${QT_INSTALL_DIR}/${QT_VERSION}/${QT_SUBDIR}"
         if [ ! -d "${QT_ROOT}" ]; then
             PYTHON="$(pick_python || true)"
-            [ -n "${PYTHON}" ] || { echo "!! 需要 Python >= 3.7 安装 Qt" >&2; exit 1; }
+            ensure_py37 "${PYTHON}" || { echo "!! aqtinstall 需要 Python >= 3.7" >&2; exit 1; }
             echo "==> 安装 Qt ${QT_VERSION} (${QT_ARCH})"
             "${PYTHON}" -m pip install --quiet --upgrade pip setuptools wheel || true
             "${PYTHON}" -m pip install --quiet "aqtinstall>=2.3.0"
@@ -137,7 +159,7 @@ else
             QT_ROOT="${QT_INSTALL_DIR}/${QT_VERSION}/gcc_64"
             if [ ! -d "${QT_ROOT}" ]; then
                 PYTHON="$(pick_python || true)"
-                [ -n "${PYTHON}" ] || { echo "!! 需要 Python >= 3.7 安装 Qt" >&2; exit 1; }
+                ensure_py37 "${PYTHON}" || { echo "!! aqtinstall 需要 Python >= 3.7" >&2; exit 1; }
                 echo "==> 下载 Qt ${QT_VERSION}（与麒麟系统源同版本）"
                 "${PYTHON}" -m pip install --quiet --upgrade pip setuptools wheel || true
                 "${PYTHON}" -m pip install --quiet "aqtinstall>=2.3.0"
@@ -156,10 +178,13 @@ else
 fi
 
 # CMake 版本（Qt6 的 CMake 包需要 3.16+，本项目要求 3.20+）
+# bionic 的 apt cmake 只有 3.10，必须走 pip；pip 也先升到 py3.6 支持的最高版，
+# 否则老 pip（9.x）对新版 PyPI 的 TLS/元数据支持不全
 if ! cmake_new_enough; then
     PYTHON="$(pick_python || true)"
     if [ -n "${PYTHON}" ]; then
         echo "==> CMake 版本不足 3.20，通过 pip 安装"
+        "${PYTHON}" -m pip install --quiet --upgrade pip setuptools wheel || true
         "${PYTHON}" -m pip install --quiet --upgrade "cmake>=3.20,<4"
     else
         echo "!! CMake 版本低于 3.20 且无法自动升级" >&2
@@ -175,11 +200,20 @@ if command -v ninja >/dev/null 2>&1; then
     GENERATOR_ARGS=(-G Ninja)
 fi
 
+# 64K 页对齐：麒麟 V10 SP1 arm64 内核页 64K，LOAD 段对齐必须 ≥ 页大小。
+# 64K 对齐的产物在 4K 页环境同样合法 —— 一包两用。
+EXE_LINKER_FLAGS=""
+if [ "${PAGE_ALIGN_64K}" = "1" ]; then
+    EXE_LINKER_FLAGS="-Wl,-z,max-page-size=65536 -Wl,-z,common-page-size=65536"
+    echo "==> 64K 页对齐链接 : ${EXE_LINKER_FLAGS}"
+fi
+
 cmake -S "${SRC_DIR}" -B "${BUILD_DIR}" \
     "${GENERATOR_ARGS[@]}" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DQT_MAJOR="${QT_MAJOR}" \
     -DQT_ROOT="${QT_ROOT:-}" \
+    -DCMAKE_EXE_LINKER_FLAGS="${EXE_LINKER_FLAGS}" \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}"
 
 cmake --build "${BUILD_DIR}" --parallel "${JOBS}"
@@ -190,26 +224,52 @@ cmake --install "${BUILD_DIR}"
 # ---------------------------------------------------------------------------
 BIN_DIR="${PREFIX}/bin"
 
-echo "==> 收集 Qt 运行库 -> ${BIN_DIR}"
-if [ -n "${QT_LIB_DIR}" ] && [ -d "${QT_LIB_DIR}" ]; then
-    # 1) ldd 找直接依赖的 Qt 库（只拷落在 Qt 目录内的）
-    ldd "${BIN_DIR}/caddemo" 2>/dev/null | awk '/=>/ {print $3}' | while read -r so; do
-        case "${so}" in
-            "${QT_LIB_DIR}"/*) cp -Lf "${so}" "${BIN_DIR}/" 2>/dev/null || true ;;
-        esac
-    done
+if [ "${SHIP_QT}" = "1" ]; then
+    echo "==> 收集 Qt 运行库 -> ${BIN_DIR}"
+    if [ -n "${QT_LIB_DIR}" ] && [ -d "${QT_LIB_DIR}" ]; then
+        # 1) ldd 找直接依赖的 Qt 库（只拷落在 Qt 目录内的）
+        ldd "${BIN_DIR}/caddemo" 2>/dev/null | awk '/=>/ {print $3}' | while read -r so; do
+            case "${so}" in
+                "${QT_LIB_DIR}"/*) cp -Lf "${so}" "${BIN_DIR}/" 2>/dev/null || true ;;
+            esac
+        done
 
-    # 2) 兜底按文件名拷（xcb / icu 这类间接依赖 ldd 未必覆盖全）
-    if [ "${QT_MAJOR}" = "6" ]; then
-        PATS="libQt6Core.so.6 libQt6Gui.so.6 libQt6Widgets.so.6 libQt6DBus.so.6
-              libQt6XcbQpa.so.6 libicui18n.so.* libicuuc.so.* libicudata.so.*"
-    else
-        PATS="libQt5Core.so.5 libQt5Gui.so.5 libQt5Widgets.so.5 libQt5DBus.so.5
-              libQt5XcbQpa.so.5 libicui18n.so.* libicuuc.so.* libicudata.so.*"
+        # 2) 兜底按文件名拷（xcb / icu 这类间接依赖 ldd 未必覆盖全）
+        if [ "${QT_MAJOR}" = "6" ]; then
+            PATS="libQt6Core.so.6 libQt6Gui.so.6 libQt6Widgets.so.6 libQt6DBus.so.6
+                  libQt6XcbQpa.so.6 libicui18n.so.* libicuuc.so.* libicudata.so.*"
+        else
+            PATS="libQt5Core.so.5 libQt5Gui.so.5 libQt5Widgets.so.5 libQt5DBus.so.5
+                  libQt5XcbQpa.so.5 libicui18n.so.* libicuuc.so.* libicudata.so.*"
+        fi
+        for pat in ${PATS}; do
+            find "${QT_LIB_DIR}" -maxdepth 1 -name "${pat}" -exec cp -Lf {} "${BIN_DIR}/" \; 2>/dev/null || true
+        done
     fi
-    for pat in ${PATS}; do
-        find "${QT_LIB_DIR}" -maxdepth 1 -name "${pat}" -exec cp -Lf {} "${BIN_DIR}/" \; 2>/dev/null || true
-    done
+
+    # 平台插件
+    mkdir -p "${BIN_DIR}/platforms" "${BIN_DIR}/imageformats" "${BIN_DIR}/iconengines"
+    cp -Lf "${QT_PLUGIN_DIR}"/platforms/libqxcb.so       "${BIN_DIR}/platforms/" 2>/dev/null || true
+    cp -Lf "${QT_PLUGIN_DIR}"/platforms/libqoffscreen.so "${BIN_DIR}/platforms/" 2>/dev/null || true
+    cp -Lf "${QT_PLUGIN_DIR}"/imageformats/*.so          "${BIN_DIR}/imageformats/" 2>/dev/null || true
+    cp -Lf "${QT_PLUGIN_DIR}"/iconengines/*.so           "${BIN_DIR}/iconengines/"  2>/dev/null || true
+
+    # RPATH：让可执行文件与各 .so 从自身目录找依赖。
+    # 用 --force-rpath 生成 DT_RPATH（DT_RUNPATH 不作用于间接依赖）。
+    if command -v patchelf >/dev/null 2>&1; then
+        patchelf --force-rpath --set-rpath '$ORIGIN' "${BIN_DIR}/caddemo" 2>/dev/null \
+            && echo "==> RPATH(DT_RPATH)=\$ORIGIN 已写入 caddemo"
+        for so in "${BIN_DIR}"/*.so.*; do
+            [ -e "${so}" ] && patchelf --set-rpath '$ORIGIN' "${so}" 2>/dev/null || true
+        done
+        for so in "${BIN_DIR}"/platforms/*.so "${BIN_DIR}"/imageformats/*.so \
+                  "${BIN_DIR}"/iconengines/*.so; do
+            [ -e "${so}" ] && patchelf --set-rpath '$ORIGIN/..' "${so}" 2>/dev/null || true
+        done
+    fi
+else
+    echo "==> SHIP_QT=0：不随包携带 Qt/插件，运行时使用目标机系统 Qt"
+    echo "    （麒麟 V10 SP1 arm64 为 64K 内存页，发行版 4K 对齐 Qt 库无法加载）"
 fi
 
 # libstdc++：目标机 GLIBCXX 较老时随包携带（麒麟服务器版只到 3.4.24）
@@ -224,35 +284,23 @@ if [ "${SHIP_LIBSTDCXX}" = "1" ]; then
     fi
 fi
 
-# 平台插件
-mkdir -p "${BIN_DIR}/platforms" "${BIN_DIR}/imageformats" "${BIN_DIR}/iconengines"
-cp -Lf "${QT_PLUGIN_DIR}"/platforms/libqxcb.so       "${BIN_DIR}/platforms/" 2>/dev/null || true
-cp -Lf "${QT_PLUGIN_DIR}"/platforms/libqoffscreen.so "${BIN_DIR}/platforms/" 2>/dev/null || true
-cp -Lf "${QT_PLUGIN_DIR}"/imageformats/*.so          "${BIN_DIR}/imageformats/" 2>/dev/null || true
-cp -Lf "${QT_PLUGIN_DIR}"/iconengines/*.so           "${BIN_DIR}/iconengines/"  2>/dev/null || true
-
-# RPATH：让可执行文件与各 .so 从自身目录找依赖。
-# 用 --force-rpath 生成 DT_RPATH（DT_RUNPATH 不作用于间接依赖）。
-if command -v patchelf >/dev/null 2>&1; then
-    patchelf --force-rpath --set-rpath '$ORIGIN' "${BIN_DIR}/caddemo" 2>/dev/null \
-        && echo "==> RPATH(DT_RPATH)=\$ORIGIN 已写入 caddemo"
-    for so in "${BIN_DIR}"/*.so.*; do
-        [ -e "${so}" ] && patchelf --set-rpath '$ORIGIN' "${so}" 2>/dev/null || true
-    done
-    for so in "${BIN_DIR}"/platforms/*.so "${BIN_DIR}"/imageformats/*.so \
-              "${BIN_DIR}"/iconengines/*.so; do
-        [ -e "${so}" ] && patchelf --set-rpath '$ORIGIN/..' "${so}" 2>/dev/null || true
-    done
-fi
-
-# 兜底启动脚本
-cat > "${BIN_DIR}/run-caddemo.sh" <<'LAUNCHER'
+# 兜底启动脚本：SHIP_QT=1 时把 bin/ 放进搜索路径（自带的 Qt/插件）；
+# SHIP_QT=0 时 bin/ 里没有库，直接执行，全部依赖走目标机系统路径
+if [ "${SHIP_QT}" = "1" ]; then
+    cat > "${BIN_DIR}/run-caddemo.sh" <<'LAUNCHER'
 #!/usr/bin/env bash
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export LD_LIBRARY_PATH="${HERE}:${LD_LIBRARY_PATH:-}"
 export QT_PLUGIN_PATH="${HERE}:${QT_PLUGIN_PATH:-}"
 exec "${HERE}/caddemo" "$@"
 LAUNCHER
+else
+    cat > "${BIN_DIR}/run-caddemo.sh" <<'LAUNCHER'
+#!/usr/bin/env bash
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${HERE}/caddemo" "$@"
+LAUNCHER
+fi
 chmod +x "${BIN_DIR}/run-caddemo.sh" "${BIN_DIR}/caddemo" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -279,11 +327,17 @@ echo "==> 完成"
 echo "    可执行文件 : ${BIN_DIR}/caddemo"
 echo "    发布包     : ${ARCHIVE}"
 echo ""
-echo "==> 符号版本（对照：麒麟服务器版 V10 = GLIBC 2.28 / GLIBCXX 3.4.24）"
+echo "==> 符号版本（对照：麒麟 V10 SP1 多架构 = GLIBC 2.28 / GLIBCXX 3.4.24）"
 report_syms "${BIN_DIR}/caddemo"
-if [ "${QT_MAJOR}" = "6" ]; then
-    report_syms "${BIN_DIR}/libQt6Core.so.6"
-else
-    report_syms "${BIN_DIR}/libQt5Core.so.5"
+if [ "${SHIP_QT}" = "1" ]; then
+    if [ "${QT_MAJOR}" = "6" ]; then
+        report_syms "${BIN_DIR}/libQt6Core.so.6"
+    else
+        report_syms "${BIN_DIR}/libQt5Core.so.5"
+    fi
+    report_syms "${BIN_DIR}/libstdc++.so.6"
 fi
-report_syms "${BIN_DIR}/libstdc++.so.6"
+if [ "${PAGE_ALIGN_64K}" = "1" ]; then
+    echo "==> LOAD 段对齐（readelf -lW）："
+    readelf -lW "${BIN_DIR}/caddemo" 2>/dev/null | awk '$1=="LOAD" {print "    LOAD Align = " $NF}'
+fi

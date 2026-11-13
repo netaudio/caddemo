@@ -1,19 +1,30 @@
 name: Build Linux (Kylin V10 桌面版)
 
-# 目标：编出能在银河麒麟桌面操作系统 V10 SP1 上运行的产物。
+# 目标：编出能在银河麒麟桌面操作系统 V10 SP1（真机 + QEMU 虚拟机）上运行的产物。
 #
-# ── 为什么麒麟侧用 Qt 5.15.2 而不是 Windows 的 Qt 6.7.3 ──────────────────
-#   麒麟桌面版 V10 SP1 基于 Ubuntu 20.04 衍生，系统源提供的 Qt 是 5.15.2（LTS），
-#   源里没有 Qt6 包。而 Qt 6.7 官方 Linux 包需要 GLIBCXX_3.4.28，麒麟桌面版
-#   刚好是 3.4.28 —— 能跑，但 Qt6 在麒麟上属于"非系统自带"，后续升级维护都别扭。
-#   所以麒麟侧一律用系统同款 Qt 5.15.2，Windows 侧继续用 Qt 6.7.3。
-#   代码已做双版本兼容（见 CadInputParser.cpp 的 kSkipEmptyParts）。
+# ── 麒麟 V10 SP1 实测环境（2026-11 于 arm64 QEMU 虚拟机验证）──────────────
+#   · glibc 2.28（多架构统一；此前注释误写 2.31 —— 麒麟底层是 RHEL8/
+#     openEuler 系而非 Ubuntu 系，只是包管理沿用 apt）
+#   · 系统 GCC 7.3 → GLIBCXX 上限 3.4.24
+#   · arm64 内核内存页 64K（getconf PAGE_SIZE = 65536）
+#   · 系统自带 Qt5：arm64 5.12+ / x86_64 5.15.2（库均为 64K 对齐）
 #
-# ── 构建环境选择 ────────────────────────────────────────────────────────
-#   麒麟桌面版 glibc 2.31 / GLIBCXX 3.4.28，与 ubuntu:20.04 (focal) 完全一致。
-#   因此用 ubuntu:20.04 容器构建，产物符号版本天然落在目标机能力内，
-#   无需打包 libstdc++，也不会出现 "GLIBC_2.34 not found"。
-#   （错用 ubuntu-22.04 会出问题：它是 glibc 2.35。）
+# ── 构建环境：ubuntu:18.04（bionic）──────────────────────────────────────
+#   glibc 2.27 ≤ 2.28（留一版余量）、gcc 7.5 → 产物最高 GLIBCXX_3.4.24
+#   与麒麟精确匹配。此前用 ubuntu:20.04（glibc 2.31）构建，产物在麒麟
+#   真机上报 "GLIBC_2.29 not found"，已在 2026-11 修正。
+#
+# ── 64K 内存页（arm64 报错主因）─────────────────────────────────────────
+#   Linux 要求 ELF 每个 LOAD 段对齐值 ≥ 内核页大小。发行版/官方 Qt 库
+#   （Ubuntu focal、aqtinstall 产物）都是 4K 对齐，在 64K 页内核上动态
+#   加载器直接拒绝 —— 与 LD_LIBRARY_PATH 无关。因此：
+#   1. 可执行文件用 -z max-page-size=65536 链接（64K 对齐）。
+#      64K 对齐产物在 4K 页环境同样合法 —— 一包同时支持真机与虚拟机。
+#   2. SHIP_QT=0 不随包携带任何 Qt/ICU/插件，运行时用目标机系统 Qt
+#      （麒麟自带，64K 对齐、glibc/GLIBCXX 天然匹配）。
+#      构建用 bionic 的 Qt 5.9.5 头文件：Qt minor 版本向后兼容，
+#      5.9 编译产物可在 5.12/5.15 运行时上运行；代码已做全 Qt5 兼容
+#      （kSkipEmptyParts / idClicked / globalPosition 均条件编译）。
 
 on:
   push:
@@ -29,14 +40,13 @@ on:
 
 env:
   QT_MAJOR: "5"
-  QT_VERSION: "5.15.2"
-  # 目标机能力上限（麒麟桌面版 V10 SP1）
-  KYLIN_MAX_GLIBC: "GLIBC_2.31"
-  KYLIN_MAX_GLIBCXX: "GLIBCXX_3.4.28"
+  # 目标机能力上限（麒麟 V10 SP1 实测，多架构一致）
+  KYLIN_MAX_GLIBC: "GLIBC_2.28"
+  KYLIN_MAX_GLIBCXX: "GLIBCXX_3.4.24"
 
 jobs:
   # =========================================================================
-  # 日常构建：GitHub 托管 runner + Ubuntu 20.04 容器。push 即出包。
+  # 日常构建：GitHub 托管 runner + Ubuntu 18.04 容器（glibc 2.27 ≤ 麒麟 2.28）。
   # =========================================================================
   kylin-x86_64:
     name: 麒麟 V10 SP1 · x86_64（托管）
@@ -51,20 +61,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 容器内构建（Ubuntu 20.04 / glibc 2.31）
+      - name: 容器内构建（Ubuntu 18.04 / glibc 2.27，系统 Qt 编译）
         run: |
           docker run --rm \
             -v "$PWD":/src \
             -w /src \
-            -e QT_MAJOR="${QT_MAJOR}" \
-            -e QT_VERSION="${QT_VERSION}" \
+            -e QT_MAJOR="5" \
             -e PREFIX=/src/dist/linux-kylin-x64 \
             -e BUILD_DIR=/src/build/linux-kylin-x64 \
-            ubuntu:20.04 \
-            bash -c "bash scripts/setup_ubuntu2004.sh && bash scripts/build_linux.sh"
+            -e SHIP_QT=0 \
+            -e PAGE_ALIGN_64K=1 \
+            ubuntu:18.04 \
+            bash -c "bash scripts/setup_ubuntu1804.sh \
+              && apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools \
+              && rm -rf /var/lib/apt/lists/* \
+              && bash scripts/build_linux.sh"
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
 
-      - name: 校验兼容性（GLIBC ≤ 2.31，GLIBCXX ≤ 3.4.28）
+      - name: 校验兼容性（GLIBC ≤ 2.28 / GLIBCXX ≤ 3.4.24 / 64K 页对齐 / 无内置 Qt）
         run: |
           BIN=dist/linux-kylin-x64/bin
 
@@ -80,12 +94,27 @@ jobs:
             fi
           }
 
-          check_max "$BIN/caddemo"        'GLIBC_[0-9.]*'   "${KYLIN_MAX_GLIBC}"   "caddemo GLIBC"
-          check_max "$BIN/caddemo"        'GLIBCXX_[0-9.]*' "${KYLIN_MAX_GLIBCXX}" "caddemo GLIBCXX"
-          check_max "$BIN/libQt5Core.so.5" 'GLIBC_[0-9.]*'   "${KYLIN_MAX_GLIBC}"   "Qt5Core GLIBC"
-          check_max "$BIN/libQt5Core.so.5" 'GLIBCXX_[0-9.]*' "${KYLIN_MAX_GLIBCXX}" "Qt5Core GLIBCXX"
+          check_max "$BIN/caddemo" 'GLIBC_[0-9.]*'   "${KYLIN_MAX_GLIBC}"   "caddemo GLIBC"
+          check_max "$BIN/caddemo" 'GLIBCXX_[0-9.]*' "${KYLIN_MAX_GLIBCXX}" "caddemo GLIBCXX"
 
-          echo "✅ 兼容麒麟桌面版 V10 SP1"
+          # LOAD 段最小对齐 ≥ 64K（64K 页内核硬要求；4K 页环境不受影响）
+          min_align=999999999
+          for a in $(readelf -lW "$BIN/caddemo" | awk '$1=="LOAD"{print $NF}'); do
+            v=$(( 16#${a#0x} ))
+            if [ "$v" -lt "$min_align" ]; then min_align=$v; fi
+          done
+          echo "caddemo LOAD 段最小对齐：0x$(printf '%x' "$min_align")（要求 ≥ 0x10000）"
+          [ "$min_align" -ge 65536 ] || {
+            echo "::error::LOAD 段对齐不足 64K，麒麟 arm64 将拒绝加载"
+            exit 1
+          }
+
+          # SHIP_QT=0：确认 bin/ 里没有打包的 Qt/ICU（目标机用系统 Qt）
+          if ls "$BIN"/libQt*.so.* "$BIN"/libicu*.so.* >/dev/null 2>&1; then
+            echo "::error::SHIP_QT=0 但 bin/ 仍含 Qt/ICU 库"
+            exit 1
+          fi
+          echo "✅ x86_64 产物兼容麒麟 V10 SP1（真机/虚拟机均适用）"
 
       # ── 冒烟测试：暂时停用 ─────────────────────────────────────────────
       # 需要时取消注释即可恢复。
@@ -118,17 +147,16 @@ jobs:
   # =========================================================================
   # ARM64 构建：GitHub 托管 runner 只有 x86_64，用 QEMU 跑 arm64 容器。
   #
-  # ── 为什么 arm64 用 ubuntu:20.04 自带的 Qt5（5.12.8）──────────────────
-  #   Qt 官方不为 linux/arm64 桌面提供 5.15.2 预编译包（aqt 仅 gcc_64）；
-  #   而 Debian bullseye 已 EOL，security 源、包版本一致性都要额外处理，
-  #   实测在该镜像上 apt 依赖反复冲突。相比更换发行版，直接用 focal 源里
-  #   的 Qt5 最稳：glibc 2.31 与麒麟 V10 SP1 一致，运行库随产物打入 bin/，
-  #   目标机不依赖系统 Qt 版本。
-  #   代码已按 Qt5 全版本兼容（见 RibbonBar.cpp 的 idClicked 分支）。
+  # ── 为什么 arm64 用 ubuntu:18.04 + 系统 Qt 5.9.5 编译 ─────────────────
+  #   aqtinstall 没有 linux/arm64 桌面包；且打包任何发行版 Qt 库都会踩
+  #   麒麟 arm64 的 64K 内存页（发行版库全是 4K 对齐，64K 内核拒绝加载）。
+  #   故 SHIP_QT=0：Qt/ICU/插件全部不打包，运行时用麒麟自带的系统 Qt
+  #   （64K 对齐、glibc 匹配）。构建用 bionic 源的 qtbase5-dev 5.9.5
+  #   头文件，Qt minor 向后兼容保证 5.9 编译产物可在麒麟 5.12/5.15 运行。
   #
   # ── 兼容性交验为什么在容器内做 ─────────────────────────────────────────
-  #   x86_64 主机的 objdump 读不了 arm64 ELF（binutils 只配了本机 target），
-  #   所以在构建容器内顺手完成校验。
+  #   x86_64 主机的 objdump/readelf 读不了 arm64 ELF（binutils 只配了
+  #   本机 target），所以在构建容器内顺手完成校验。
   # =========================================================================
   kylin-arm64:
     name: 麒麟 V10 SP1 · arm64（托管）
@@ -141,21 +169,22 @@ jobs:
         with:
           platforms: arm64
 
-      - name: 容器内构建 + 校验（Ubuntu 20.04 arm64 / glibc 2.31 / Qt 5.12.8）
+      - name: 容器内构建 + 校验（Ubuntu 18.04 arm64 / glibc 2.27 / Qt 5.9.5 头文件 / 64K 对齐）
         run: |
           mkdir -p build
           set +e
           docker run --rm --platform linux/arm64 \
             -v "$PWD":/src \
             -w /src \
-            -e QT_MAJOR="${QT_MAJOR}" \
-            -e QT_VERSION="${QT_VERSION}" \
+            -e QT_MAJOR="5" \
             -e PREFIX=/src/dist/linux-kylin-arm64 \
             -e BUILD_DIR=/src/build/linux-kylin-arm64 \
-            ubuntu:20.04 \
+            -e SHIP_QT=0 \
+            -e PAGE_ALIGN_64K=1 \
+            ubuntu:18.04 \
             bash -c "
               set -euo pipefail
-              bash scripts/setup_ubuntu2004.sh
+              bash scripts/setup_ubuntu1804.sh
               apt-get update
               apt-get install -y --no-install-recommends qtbase5-dev qtbase5-dev-tools
               rm -rf /var/lib/apt/lists/*
@@ -174,11 +203,25 @@ jobs:
                   return 1
                 fi
               }
-              check_max \"\$BIN/caddemo\"        'GLIBC_[0-9.]*'   '${KYLIN_MAX_GLIBC}'   'caddemo GLIBC'
-              check_max \"\$BIN/caddemo\"        'GLIBCXX_[0-9.]*' '${KYLIN_MAX_GLIBCXX}' 'caddemo GLIBCXX'
-              check_max \"\$BIN/libQt5Core.so.5\" 'GLIBC_[0-9.]*'   '${KYLIN_MAX_GLIBC}'   'Qt5Core GLIBC'
-              check_max \"\$BIN/libQt5Core.so.5\" 'GLIBCXX_[0-9.]*' '${KYLIN_MAX_GLIBCXX}' 'Qt5Core GLIBCXX'
-              echo '✅ arm64 产物兼容麒麟桌面版 V10 SP1'
+              check_max \"\$BIN/caddemo\" 'GLIBC_[0-9.]*'   '${KYLIN_MAX_GLIBC}'   'caddemo GLIBC'
+              check_max \"\$BIN/caddemo\" 'GLIBCXX_[0-9.]*' '${KYLIN_MAX_GLIBCXX}' 'caddemo GLIBCXX'
+
+              min_align=999999999
+              for a in \$(readelf -lW \"\$BIN/caddemo\" | awk '\$1==\"LOAD\"{print \$NF}'); do
+                v=\$(( 16#\${a#0x} ))
+                if [ \"\$v\" -lt \"\$min_align\" ]; then min_align=\$v; fi
+              done
+              echo \"caddemo LOAD 段最小对齐：0x\$(printf '%x' \"\$min_align\")（要求 ≥ 0x10000，64K 页内核硬要求）\"
+              [ \"\$min_align\" -ge 65536 ] || {
+                echo \"::error::LOAD 段对齐不足 64K，麒麟 arm64 将拒绝加载\"
+                exit 1
+              }
+
+              if ls \"\$BIN\"/libQt*.so.* \"\$BIN\"/libicu*.so.* >/dev/null 2>&1; then
+                echo \"::error::SHIP_QT=0 但 bin/ 仍含 Qt/ICU 库（4K 对齐库在 64K 页内核上无法加载）\"
+                exit 1
+              fi
+              echo '✅ arm64 产物兼容麒麟 V10 SP1（64K 页真机 / 4K 页环境 / QEMU 虚拟机均适用）'
             " 2>&1 | tee build/arm64-build.log
           rc=${PIPESTATUS[0]}
           set -e
